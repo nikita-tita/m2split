@@ -12,10 +12,11 @@ import { formatCurrency, formatDate } from '@/lib/validations';
 import { downloadRegistryCSV, downloadRegistryJSON } from '@/lib/export';
 import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
 import { businessProcessContent } from '@/lib/business-process-content';
+import { OnboardingTip } from '@/components/ui/OnboardingTip';
 import Link from 'next/link';
 
 export default function RegistriesPage() {
-  const { registries } = useStore();
+  const { registries, currentRole } = useStore();
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'info' | 'success' | 'warning' | 'danger'> = {
@@ -57,6 +58,23 @@ export default function RegistriesPage() {
             </Button>
           </Link>
         </div>
+
+        {/* Onboarding Tips by Role */}
+        {currentRole === 'M2_OPERATOR' && (
+          <OnboardingTip
+            id="m2-registries-list"
+            title="💸 Реестры выплат исполнителям"
+            description="Здесь формируются реестры для выплат исполнителям после оплаты заявок застройщиком. Когда исполнителей несколько на одну заявку, система автоматически сплитит комиссию по их долям. Реестр отправляется в банк, и М2 выплачивает исполнителям со спецсчёта."
+          />
+        )}
+
+        {currentRole === 'DEVELOPER_ADMIN' && (
+          <OnboardingTip
+            id="dev-registries-list"
+            title="📊 Реестры распределения комиссий"
+            description="Здесь видно, как М2 распределяет комиссии КВН между исполнителями ваших заявок. После оплаты заявки, М2 сплитит комиссию и выплачивает исполнителям согласно их вкладу в сделку."
+          />
+        )}
 
         {/* Business Process Description */}
         <BusinessProcessInfo {...businessProcessContent.registriesList} />

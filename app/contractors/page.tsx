@@ -15,6 +15,7 @@ import { counterpartiesService } from '@/lib/services/counterparties.service';
 import { eventsService } from '@/lib/services/events.service';
 import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
 import { businessProcessContent } from '@/lib/business-process-content';
+import { OnboardingTip } from '@/components/ui/OnboardingTip';
 import { useStore } from '@/lib/store';
 
 interface ContractorForm {
@@ -222,6 +223,39 @@ export default function ContractorsPage() {
             Добавить контрагента
           </Button>
         </div>
+
+        {/* Onboarding Tips by Role */}
+        {currentRole === 'M2_OPERATOR' && (
+          <OnboardingTip
+            id="m2-contractors-list"
+            title="👥 Управление исполнителями"
+            description="Здесь управляются все исполнители заявок застройщиков: агентства, агенты, ИП, НПД. Добавляйте новых исполнителей, проверяйте реквизиты, принимайте оферты. Каждый исполнитель должен принять оферту перед первой выплатой."
+          />
+        )}
+
+        {currentRole === 'DEVELOPER_ADMIN' && (
+          <OnboardingTip
+            id="dev-contractors-list"
+            title="🔍 Исполнители ваших заявок"
+            description="Здесь показаны все исполнители, которые работают с вашими заявками через М2. Вы видите агентства и агентов, которые находят клиентов из вашей базы контактов и оформляют сделки."
+          />
+        )}
+
+        {currentRole === 'AGENCY_ADMIN' && (
+          <OnboardingTip
+            id="agency-contractors-list"
+            title="👨‍💼 Агенты вашего агентства"
+            description="Здесь управляются агенты вашего агентства. Добавляйте новых агентов, указывайте их реквизиты, следите за принятием оферт. Это нужно для корректного распределения комиссии между агентством и агентами."
+          />
+        )}
+
+        {currentRole === 'CONTRACTOR' && (
+          <OnboardingTip
+            id="contractor-profile"
+            title="👤 Ваш профиль исполнителя"
+            description="Здесь ваши данные как исполнителя заявок. Убедитесь, что реквизиты указаны правильно - на них будут приходить выплаты. Обязательно примите оферту М2 перед началом работы."
+          />
+        )}
 
         {/* Business Process Description */}
         <BusinessProcessInfo {...businessProcessContent.contractors} />
