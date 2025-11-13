@@ -1,22 +1,43 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
-import { Plus, Search, Download } from 'lucide-react';
-import { useStore } from '@/lib/store';
+import { Plus, Search, Download, Loader2 } from 'lucide-react';
+import { Deal } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/validations';
 import { downloadDealsCSV } from '@/lib/export';
+import { dealsService } from '@/lib/services/deals.service';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function DealsPage() {
-  const { deals } = useStore();
+  const router = useRouter();
+
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    loadDeals();
+  }, []);
+
+  const loadDeals = async () => {
+    try {
+      setLoading(true);
+      const data = await dealsService.getDeals();
+      setDeals(data);
+    } catch (error) {
+      console.error('Failed to load deals:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredDeals = deals.filter((deal) => {
     const matchesSearch =
@@ -100,58 +121,75 @@ export default function DealsPage() {
 
         {/* Deals Table */}
         <Card padding="none">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableCell header>№ сделки</TableCell>
-                <TableCell header>Объект</TableCell>
-                <TableCell header>Лот</TableCell>
-                <TableCell header>Сумма КВН</TableCell>
-                <TableCell header>Участников</TableCell>
-                <TableCell header>Статус</TableCell>
-                <TableCell header>Дата создания</TableCell>
-                <TableCell header> </TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredDeals.map((deal) => (
-                <TableRow key={deal.id}>
-                  <TableCell>
-                    <span className="font-mono text-xs">{deal.id}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{deal.objectName}</div>
-                      <div className="text-xs text-gray-500 max-w-xs truncate">
-                        {deal.objectAddress}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{deal.lotNumber || '—'}</TableCell>
-                  <TableCell className="font-medium">
-                    {formatCurrency(deal.totalAmount)}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-gray-600">{deal.shares.length}</span>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(deal.status)}</TableCell>
-                  <TableCell>{formatDate(deal.createdAt)}</TableCell>
-                  <TableCell>
-                    <Link href={`/deals/${deal.id}`}>
-                      <Button variant="ghost" size="sm">
-                        Открыть
-                      </Button>
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {filteredDeals.length === 0 && (
+          {loading ? (
             <div className="text-center py-12">
-              <p className="text-gray-500">Сделки не найдены</p>
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" />
+              <p className="text-gray-500 mt-4">Загрузка сделок...</p>
             </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableCell header>№ сделки</TableCell>
+                    <TableCell header>Объект</TableCell>
+                    <TableCell header>Лот</TableCell>
+                    <TableCell header>Сумма КВН</TableCell>
+                    <TableCell header>Участников</TableCell>
+                    <TableCell header>Статус</TableCell>
+                    <TableCell header>Дата создания</TableCell>
+                    <TableCell header> </TableCell>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredDeals.map((deal) => (
+                    <TableRow
+                      key={deal.id}
+                      onClick={() => router.push(`/deals/${deal.id}`)}
+                      className="cursor-pointer hover:bg-gray-50 transition-colors"
+                    >
+                      <TableCell>
+                        <span className="font-mono text-xs">{deal.dealNumber || deal.id}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{deal.objectName}</div>
+                          <div className="text-xs text-gray-500 max-w-xs truncate">
+                            {deal.objectAddress}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{deal.lotNumber || '—'}</TableCell>
+                      <TableCell className="font-medium">
+                        {formatCurrency(deal.totalAmount)}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-gray-600">{deal.shares.length}</span>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(deal.status)}</TableCell>
+                      <TableCell>{formatDate(deal.createdAt)}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Link href={`/deals/${deal.id}`}>
+                          <Button variant="ghost" size="sm">
+                            Открыть
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {filteredDeals.length === 0 && !loading && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">
+                    {searchTerm || statusFilter !== 'all'
+                      ? 'Сделки не найдены'
+                      : 'Пока нет сделок. Создайте первую сделку!'}
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </Card>
       </div>

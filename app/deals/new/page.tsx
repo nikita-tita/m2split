@@ -1,17 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
-import { useStore } from '@/lib/store';
-import { mockContractors, mockUsers } from '@/lib/mock-data';
-import { Deal, DealShare, DealStatus, ContractorRole, TaxRegime, VATRate } from '@/types';
+import { ArrowLeft, Plus, Trash2, AlertCircle, Loader2 } from 'lucide-react';
+import { Contractor, ContractorRole, TaxRegime, VATRate } from '@/types';
 import { formatCurrency } from '@/lib/validations';
+import { dealsService } from '@/lib/services/deals.service';
+import { counterpartiesService } from '@/lib/services/counterparties.service';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -27,8 +27,8 @@ interface ShareForm {
 
 export default function NewDealPage() {
   const router = useRouter();
-  const { addDeal } = useStore();
 
+  // Form state
   const [objectName, setObjectName] = useState('');
   const [objectAddress, setObjectAddress] = useState('');
   const [lotNumber, setLotNumber] = useState('');
@@ -36,6 +36,32 @@ export default function NewDealPage() {
   const [contractNumber, setContractNumber] = useState('');
   const [contractDate, setContractDate] = useState('');
   const [shares, setShares] = useState<ShareForm[]>([]);
+
+  // UI state
+  const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingContractors, setLoadingContractors] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load contractors on mount
+  useEffect(() => {
+    loadContractors();
+  }, []);
+
+  const loadContractors = async () => {
+    try {
+      setLoadingContractors(true);
+      const data = await counterpartiesService.getCounterparties({
+        offerAccepted: true, // Only show contractors who accepted the offer
+      });
+      setContractors(data);
+    } catch (err) {
+      console.error('Failed to load contractors:', err);
+      setError('Не удалось загрузить контрагентов');
+    } finally {
+      setLoadingContractors(false);
+    }
+  };
 
   const addShare = () => {
     setShares([...shares, {
@@ -56,17 +82,11 @@ export default function NewDealPage() {
     const newShares = [...shares];
     newShares[index] = { ...newShares[index], [field]: value };
 
-    // Auto-set VAT rate when taxRegime is VAT
-    if (field === 'taxRegime' && value === 'VAT') {
+    // Auto-set VAT rate when taxRegime is OSN (НДС)
+    if (field === 'taxRegime' && value === 'OSN') {
       newShares[index].vatRate = 20;
-    } else if (field === 'taxRegime' && value !== 'VAT') {
+    } else if (field === 'taxRegime' && value !== 'OSN') {
       newShares[index].vatRate = undefined;
-    }
-
-    // Auto-calculate amount based on share percent
-    if (field === 'sharePercent' && totalAmount) {
-      const amount = (parseFloat(totalAmount) * value) / 100;
-      // Store amount in state if needed
     }
 
     setShares(newShares);
@@ -74,56 +94,55 @@ export default function NewDealPage() {
 
   const sharesTotal = shares.reduce((sum, share) => sum + share.sharePercent, 0);
   const isValidShares = Math.abs(sharesTotal - 100) < 0.01;
-  const canSubmit = objectName && objectAddress && totalAmount && shares.length > 0 && isValidShares;
+  const canSubmit = objectName && objectAddress && totalAmount && shares.length > 0 && isValidShares && !loading;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!canSubmit) return;
 
-    const dealId = `d${Date.now()}`;
-    const amount = parseFloat(totalAmount);
+    setLoading(true);
+    setError(null);
 
-    const dealShares: DealShare[] = shares.map((share, index) => {
-      const contractor = mockContractors.find(c => c.id === share.contractorId);
-      return {
-        id: `s${dealId}_${index}`,
-        contractorId: share.contractorId,
-        contractor,
-        role: share.role,
-        sharePercent: share.sharePercent,
-        amount: (amount * share.sharePercent) / 100,
-        taxRegime: share.taxRegime,
-        vatRate: share.vatRate,
-        contractNumber: share.contractNumber || undefined,
-        contractDate: share.contractDate ? new Date(share.contractDate) : undefined,
+    try {
+      const amount = parseFloat(totalAmount);
+
+      // Find developer and agency from contractors
+      const developer = contractors.find(c => c.type === 'DEVELOPER');
+      const agency = shares.find(s => s.role === 'AGENCY');
+      const agencyContractor = agency ? contractors.find(c => c.id === agency.contractorId) : undefined;
+
+      const dealInput = {
+        objectName,
+        objectAddress,
+        lotNumber: lotNumber || undefined,
+        developerId: developer?.id,
+        agencyId: agencyContractor?.id,
+        totalAmount: amount,
+        commissionAmount: amount,
+        contractNumber: contractNumber || undefined,
+        contractDate: contractDate ? new Date(contractDate) : undefined,
+        shares: shares.map(share => ({
+          contractorId: share.contractorId,
+          role: share.role,
+          sharePercent: share.sharePercent,
+          amount: (amount * share.sharePercent) / 100,
+          taxRegime: share.taxRegime,
+          vatRate: share.vatRate,
+          contractNumber: share.contractNumber || undefined,
+          contractDate: share.contractDate ? new Date(share.contractDate) : undefined,
+        })),
       };
-    });
 
-    const newDeal: Deal = {
-      id: dealId,
-      objectName,
-      objectAddress,
-      lotNumber: lotNumber || undefined,
-      developerId: '1',
-      totalAmount: amount,
-      status: 'DRAFT' as DealStatus,
-      shares: dealShares,
-      contractNumber: contractNumber || undefined,
-      contractDate: contractDate ? new Date(contractDate) : undefined,
-      responsibleUserId: '2',
-      initiator: {
-        role: 'M2_OPERATOR',
-        partyId: '1',
-        userId: '2',
-        timestamp: new Date(),
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+      const createdDeal = await dealsService.createDeal(dealInput);
 
-    addDeal(newDeal);
-    router.push(`/deals/${dealId}`);
+      // Success! Redirect to deal detail
+      router.push(`/deals/${createdDeal.id}`);
+    } catch (err: any) {
+      console.error('Failed to create deal:', err);
+      setError(err.message || 'Не удалось создать сделку');
+      setLoading(false);
+    }
   };
 
   return (
@@ -145,13 +164,33 @@ export default function NewDealPage() {
           </div>
           <div className="flex gap-3">
             <Link href="/deals">
-              <Button type="button" variant="secondary">Отмена</Button>
+              <Button type="button" variant="secondary" disabled={loading}>
+                Отмена
+              </Button>
             </Link>
             <Button type="submit" disabled={!canSubmit}>
-              Создать сделку
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Создание...
+                </>
+              ) : (
+                'Создать сделку'
+              )}
             </Button>
           </div>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-red-800">Ошибка создания сделки</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          </div>
+        )}
 
         {/* Basic Info */}
         <Card>
@@ -163,6 +202,7 @@ export default function NewDealPage() {
               value={objectName}
               onChange={(e) => setObjectName(e.target.value)}
               required
+              disabled={loading}
             />
             <Input
               label="Адрес объекта"
@@ -170,6 +210,7 @@ export default function NewDealPage() {
               value={objectAddress}
               onChange={(e) => setObjectAddress(e.target.value)}
               required
+              disabled={loading}
             />
             <div className="grid grid-cols-2 gap-4">
               <Input
@@ -177,6 +218,7 @@ export default function NewDealPage() {
                 placeholder="Кв. 45"
                 value={lotNumber}
                 onChange={(e) => setLotNumber(e.target.value)}
+                disabled={loading}
               />
               <Input
                 label="Сумма комиссии (₽)"
@@ -185,6 +227,7 @@ export default function NewDealPage() {
                 value={totalAmount}
                 onChange={(e) => setTotalAmount(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -193,12 +236,14 @@ export default function NewDealPage() {
                 placeholder="ДК-2024-001"
                 value={contractNumber}
                 onChange={(e) => setContractNumber(e.target.value)}
+                disabled={loading}
               />
               <Input
                 label="Дата договора"
                 type="date"
                 value={contractDate}
                 onChange={(e) => setContractDate(e.target.value)}
+                disabled={loading}
               />
             </div>
           </div>
@@ -219,14 +264,27 @@ export default function NewDealPage() {
                   )}
                 </p>
               </div>
-              <Button type="button" variant="secondary" size="sm" onClick={addShare}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={addShare}
+                disabled={loading || loadingContractors}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Добавить получателя
               </Button>
             </div>
           </div>
 
-          {shares.length > 0 && (
+          {loadingContractors && (
+            <div className="text-center py-12 border-t">
+              <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
+              <p className="text-gray-500 mt-2">Загрузка контрагентов...</p>
+            </div>
+          )}
+
+          {!loadingContractors && shares.length > 0 && (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -247,9 +305,10 @@ export default function NewDealPage() {
                       <Select
                         value={share.contractorId}
                         onChange={(e) => updateShare(index, 'contractorId', e.target.value)}
+                        disabled={loading}
                         options={[
                           { value: '', label: 'Выберите контрагента' },
-                          ...mockContractors.map(c => ({
+                          ...contractors.map(c => ({
                             value: c.id,
                             label: `${c.name} (${c.inn})`
                           }))
@@ -260,6 +319,7 @@ export default function NewDealPage() {
                       <Select
                         value={share.role}
                         onChange={(e) => updateShare(index, 'role', e.target.value)}
+                        disabled={loading}
                         options={[
                           { value: 'AGENCY', label: 'АН' },
                           { value: 'AGENT', label: 'Агент' },
@@ -276,6 +336,7 @@ export default function NewDealPage() {
                         max="100"
                         value={share.sharePercent || ''}
                         onChange={(e) => updateShare(index, 'sharePercent', parseFloat(e.target.value) || 0)}
+                        disabled={loading}
                       />
                     </TableCell>
                     <TableCell className="font-medium">
@@ -287,18 +348,20 @@ export default function NewDealPage() {
                       <Select
                         value={share.taxRegime}
                         onChange={(e) => updateShare(index, 'taxRegime', e.target.value)}
+                        disabled={loading}
                         options={[
-                          { value: 'VAT', label: 'НДС' },
+                          { value: 'OSN', label: 'НДС' },
                           { value: 'USN', label: 'УСН' },
                           { value: 'NPD', label: 'НПД' },
                         ]}
                       />
                     </TableCell>
                     <TableCell>
-                      {share.taxRegime === 'VAT' ? (
+                      {share.taxRegime === 'OSN' ? (
                         <Select
                           value={share.vatRate?.toString() || '20'}
                           onChange={(e) => updateShare(index, 'vatRate', parseInt(e.target.value))}
+                          disabled={loading}
                           options={[
                             { value: '0', label: '0%' },
                             { value: '10', label: '10%' },
@@ -315,11 +378,13 @@ export default function NewDealPage() {
                           placeholder="№ договора"
                           value={share.contractNumber}
                           onChange={(e) => updateShare(index, 'contractNumber', e.target.value)}
+                          disabled={loading}
                         />
                         <Input
                           type="date"
                           value={share.contractDate}
                           onChange={(e) => updateShare(index, 'contractDate', e.target.value)}
+                          disabled={loading}
                         />
                       </div>
                     </TableCell>
@@ -329,6 +394,7 @@ export default function NewDealPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeShare(index)}
+                        disabled={loading}
                       >
                         <Trash2 className="w-4 h-4 text-red-600" />
                       </Button>
@@ -339,7 +405,7 @@ export default function NewDealPage() {
             </Table>
           )}
 
-          {shares.length === 0 && (
+          {!loadingContractors && shares.length === 0 && (
             <div className="text-center py-12 border-t">
               <p className="text-gray-500">Нажмите &ldquo;Добавить получателя&rdquo; для распределения долей</p>
             </div>
