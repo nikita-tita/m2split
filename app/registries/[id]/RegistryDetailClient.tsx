@@ -159,6 +159,88 @@ export default function RegistryDetailClient({ id }: RegistryDetailClientProps) 
     }
   };
 
+  const handleUpdatePaymentStatus = async (
+    lineId: string,
+    newStatus: 'PENDING' | 'ACCEPTED_BY_BANK' | 'EXECUTED' | 'ERROR',
+    contractorName?: string
+  ) => {
+    setUpdating(true);
+    try {
+      let errorCode: string | undefined;
+      let errorText: string | undefined;
+
+      // If marking as error, ask for error details
+      if (newStatus === 'ERROR') {
+        errorCode = prompt('Код ошибки банка:') || undefined;
+        errorText = prompt('Описание ошибки:') || undefined;
+        if (!errorText) {
+          alert('Необходимо указать описание ошибки');
+          setUpdating(false);
+          return;
+        }
+      }
+
+      // Update payment status
+      try {
+        await registriesService.updatePaymentLineStatus(lineId, newStatus, errorCode, errorText);
+      } catch (error) {
+        console.warn('Supabase not configured, updating store directly');
+      }
+
+      // Update store - find and update the specific line
+      const updatedLines = registry.lines.map(line =>
+        line.id === lineId
+          ? {
+              ...line,
+              paymentStatus: newStatus,
+              bankErrorCode: errorCode,
+              bankErrorText: errorText,
+            }
+          : line
+      );
+
+      updateRegistry(registry.id, {
+        lines: updatedLines,
+      });
+
+      // Log event
+      await eventsService.logEvent({
+        type: 'PAYMENT_STATUS_CHANGED',
+        entityType: 'PAYMENT',
+        entityId: lineId,
+        userId: '2', // TODO: Get from auth
+        userName: 'M2 Operator',
+        userRole: currentRole,
+        description: `Статус выплаты изменён: ${contractorName || 'Получатель'} → ${getPaymentStatusLabel(newStatus)}`,
+        metadata: {
+          registryId: registry.id,
+          registryNumber: registry.registryNumber,
+          lineId,
+          newStatus,
+          errorCode,
+          errorText,
+        },
+      });
+
+      alert(`Статус выплаты обновлён: ${getPaymentStatusLabel(newStatus)}`);
+    } catch (error) {
+      console.error('Failed to update payment status:', error);
+      alert('Не удалось обновить статус выплаты');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const getPaymentStatusLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+      PENDING: 'Ожидание',
+      ACCEPTED_BY_BANK: 'Принято банком',
+      EXECUTED: 'Исполнено',
+      ERROR: 'Ошибка',
+    };
+    return labels[status] || status;
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'info' | 'success' | 'warning' | 'danger'> = {
       DRAFT: 'default',
@@ -190,14 +272,7 @@ export default function RegistryDetailClient({ id }: RegistryDetailClientProps) 
       ERROR: 'danger',
     };
 
-    const labels: Record<string, string> = {
-      PENDING: 'Ожидание',
-      ACCEPTED_BY_BANK: 'Принято банком',
-      EXECUTED: 'Исполнено',
-      ERROR: 'Ошибка',
-    };
-
-    return <Badge variant={variants[status] || 'default'} size="sm">{labels[status] || status}</Badge>;
+    return <Badge variant={variants[status] || 'default'} size="sm">{getPaymentStatusLabel(status)}</Badge>;
   };
 
   return (
@@ -360,9 +435,32 @@ export default function RegistryDetailClient({ id }: RegistryDetailClientProps) 
                     <span className="font-mono text-xs">{line.bik}</span>
                   </TableCell>
                   <TableCell>
-                    {getPaymentStatusBadge(line.paymentStatus)}
+                    <div className="flex items-center gap-2">
+                      {getPaymentStatusBadge(line.paymentStatus)}
+                      {/* M2 Operator can update payment status when registry sent to bank */}
+                      {currentRole === 'M2_OPERATOR' &&
+                       (registry.status === 'SENT_TO_BANK' || registry.status === 'EXECUTED') &&
+                       line.paymentStatus !== 'EXECUTED' && (
+                        <select
+                          value={line.paymentStatus}
+                          onChange={(e) => handleUpdatePaymentStatus(
+                            line.id,
+                            e.target.value as 'PENDING' | 'ACCEPTED_BY_BANK' | 'EXECUTED' | 'ERROR',
+                            line.contractor?.name
+                          )}
+                          disabled={updating}
+                          className="text-xs border border-gray-300 rounded px-2 py-1"
+                        >
+                          <option value="PENDING">Ожидание</option>
+                          <option value="ACCEPTED_BY_BANK">Принято банком</option>
+                          <option value="EXECUTED">Исполнено</option>
+                          <option value="ERROR">Ошибка</option>
+                        </select>
+                      )}
+                    </div>
                     {line.bankErrorText && (
                       <div className="text-xs text-red-600 mt-1">
+                        {line.bankErrorCode && `[${line.bankErrorCode}] `}
                         {line.bankErrorText}
                       </div>
                     )}
