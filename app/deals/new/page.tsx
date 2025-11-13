@@ -35,6 +35,12 @@ export default function NewDealPage() {
   const [totalAmount, setTotalAmount] = useState('');
   const [contractNumber, setContractNumber] = useState('');
   const [contractDate, setContractDate] = useState('');
+
+  // Client fields (на кого бронируем)
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+
   const [shares, setShares] = useState<ShareForm[]>([]);
 
   const addShare = () => {
@@ -56,10 +62,10 @@ export default function NewDealPage() {
     const newShares = [...shares];
     newShares[index] = { ...newShares[index], [field]: value };
 
-    // Auto-set VAT rate when taxRegime is VAT
-    if (field === 'taxRegime' && value === 'VAT') {
+    // Auto-set VAT rate when taxRegime is OSN
+    if (field === 'taxRegime' && value === 'OSN') {
       newShares[index].vatRate = 20;
-    } else if (field === 'taxRegime' && value !== 'VAT') {
+    } else if (field === 'taxRegime' && value !== 'OSN') {
       newShares[index].vatRate = undefined;
     }
 
@@ -111,6 +117,9 @@ export default function NewDealPage() {
       shares: dealShares,
       contractNumber: contractNumber || undefined,
       contractDate: contractDate ? new Date(contractDate) : undefined,
+      clientName: clientName || undefined,
+      clientPhone: clientPhone || undefined,
+      clientEmail: clientEmail || undefined,
       responsibleUserId: '2',
       initiator: {
         role: 'M2_OPERATOR',
@@ -204,6 +213,36 @@ export default function NewDealPage() {
           </div>
         </Card>
 
+        {/* Client Info */}
+        <Card>
+          <CardHeader title="Информация о клиенте" />
+          <p className="text-sm text-gray-500 mb-4">На кого бронируем объект</p>
+          <div className="space-y-4">
+            <Input
+              label="ФИО клиента"
+              placeholder="Иванов Иван Иванович"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Телефон"
+                type="tel"
+                placeholder="+7 (999) 123-45-67"
+                value={clientPhone}
+                onChange={(e) => setClientPhone(e.target.value)}
+              />
+              <Input
+                label="Email"
+                type="email"
+                placeholder="client@example.com"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+              />
+            </div>
+          </div>
+        </Card>
+
         {/* Shares */}
         <Card padding="none">
           <div className="p-6">
@@ -288,14 +327,14 @@ export default function NewDealPage() {
                         value={share.taxRegime}
                         onChange={(e) => updateShare(index, 'taxRegime', e.target.value)}
                         options={[
-                          { value: 'VAT', label: 'НДС' },
+                          { value: 'OSN', label: 'НДС' },
                           { value: 'USN', label: 'УСН' },
                           { value: 'NPD', label: 'НПД' },
                         ]}
                       />
                     </TableCell>
                     <TableCell>
-                      {share.taxRegime === 'VAT' ? (
+                      {share.taxRegime === 'OSN' ? (
                         <Select
                           value={share.vatRate?.toString() || '20'}
                           onChange={(e) => updateShare(index, 'vatRate', parseInt(e.target.value))}
