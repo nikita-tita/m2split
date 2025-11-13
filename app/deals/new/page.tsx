@@ -22,6 +22,7 @@ interface ShareForm {
   contractorId: string;
   role: ContractorRole;
   sharePercent: number;
+  amount: number; // Auto-calculated from sharePercent and commission
   taxRegime: TaxRegime;
   vatRate?: VATRate;
   contractNumber: string;
@@ -123,6 +124,19 @@ export default function NewDealPage() {
     findTariff();
   }, [selectedProjectId, selectedDeveloperId, totalAmount]);
 
+  // Recalculate all share amounts when commission changes
+  useEffect(() => {
+    if (calculatedCommission > 0 && shares.length > 0) {
+      setShares(prevShares =>
+        prevShares.map(share => ({
+          ...share,
+          amount: (calculatedCommission * share.sharePercent) / 100,
+        }))
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calculatedCommission]);
+
   const loadDevelopersAndProjects = async () => {
     try {
       // Load developers
@@ -148,6 +162,7 @@ export default function NewDealPage() {
       contractorId: '',
       role: 'AGENT',
       sharePercent: 0,
+      amount: 0,
       taxRegime: 'USN',
       contractNumber: '',
       contractDate: '',
@@ -169,10 +184,9 @@ export default function NewDealPage() {
       newShares[index].vatRate = undefined;
     }
 
-    // Auto-calculate amount based on share percent
-    if (field === 'sharePercent' && totalAmount) {
-      const amount = (parseFloat(totalAmount) * value) / 100;
-      // Store amount in state if needed
+    // Auto-calculate amount based on share percent and commission
+    if (field === 'sharePercent' && calculatedCommission > 0) {
+      newShares[index].amount = (calculatedCommission * value) / 100;
     }
 
     setShares(newShares);
@@ -198,7 +212,7 @@ export default function NewDealPage() {
         contractor,
         role: share.role,
         sharePercent: share.sharePercent,
-        amount: (amount * share.sharePercent) / 100,
+        amount: share.amount, // Use pre-calculated amount from commission
         taxRegime: share.taxRegime,
         vatRate: share.vatRate,
         contractNumber: share.contractNumber || undefined,
@@ -489,8 +503,8 @@ export default function NewDealPage() {
                       />
                     </TableCell>
                     <TableCell className="font-medium">
-                      {totalAmount && share.sharePercent
-                        ? formatCurrency((parseFloat(totalAmount) * share.sharePercent) / 100)
+                      {calculatedCommission > 0 && share.amount > 0
+                        ? formatCurrency(share.amount)
                         : '—'}
                     </TableCell>
                     <TableCell>
