@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
-import { Deal, DealShare, Contractor } from '@/types';
+import { Deal, DealShare, DealStatus, Contractor } from '@/types';
 import { mockDeals, mockContractors } from '../mock-data';
 
 export interface CreateDealInput {
@@ -26,7 +26,7 @@ export interface CreateDealInput {
 
 export interface UpdateDealInput extends Partial<CreateDealInput> {
   id: string;
-  status?: 'draft' | 'ready_for_registry' | 'in_registry' | 'closed';
+  status?: DealStatus;
 }
 
 class DealsService {
