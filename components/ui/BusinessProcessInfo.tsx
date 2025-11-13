@@ -19,6 +19,10 @@ interface BusinessProcessInfoProps {
     title: string;
     items: string[];
   };
+  metrics?: {
+    title: string;
+    items: string[];
+  };
   variant?: 'default' | 'compact';
   defaultExpanded?: boolean;
 }
@@ -30,6 +34,7 @@ export function BusinessProcessInfo({
   operations,
   documents,
   accounts,
+  metrics,
   variant = 'default',
   defaultExpanded = false,
 }: BusinessProcessInfoProps) {
@@ -103,6 +108,18 @@ export function BusinessProcessInfo({
               <h4 className="font-semibold text-blue-900 mb-2">{documents.title}</h4>
               <ul className="list-disc list-inside space-y-1 text-blue-800">
                 {documents.items.map((item, index) => (
+                  <li key={index} className="leading-relaxed">{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Metrics */}
+          {metrics && (
+            <div className="bg-white bg-opacity-50 rounded-lg p-3">
+              <h4 className="font-semibold text-blue-900 mb-2">{metrics.title}</h4>
+              <ul className="list-disc list-inside space-y-1 text-blue-800">
+                {metrics.items.map((item, index) => (
                   <li key={index} className="leading-relaxed">{item}</li>
                 ))}
               </ul>
