@@ -12,6 +12,8 @@ import { Deal } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/validations';
 import { downloadDealsCSV } from '@/lib/export';
 import { dealsService } from '@/lib/services/deals.service';
+import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
+import { businessProcessContent } from '@/lib/business-process-content';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -94,6 +96,9 @@ export default function DealsPage() {
             </Link>
           </div>
         </div>
+
+        {/* Business Process Description */}
+        <BusinessProcessInfo {...businessProcessContent.dealsList} />
 
         {/* Filters */}
         <Card>

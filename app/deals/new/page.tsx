@@ -16,6 +16,8 @@ import { counterpartiesService } from '@/lib/services/counterparties.service';
 import { projectsService } from '@/lib/services/projects.service';
 import { tariffsService } from '@/lib/services/tariffs.service';
 import { eventsService } from '@/lib/services/events.service';
+import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
+import { businessProcessContent } from '@/lib/business-process-content';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -324,6 +326,9 @@ export default function NewDealPage() {
             </Button>
           </div>
         </div>
+
+        {/* Business Process Description */}
+        <BusinessProcessInfo {...businessProcessContent.dealCreation} />
 
         {/* Basic Info */}
         <Card>

@@ -13,6 +13,8 @@ import { Contractor, ContractorType } from '@/types';
 import { formatDateTime } from '@/lib/validations';
 import { counterpartiesService } from '@/lib/services/counterparties.service';
 import { eventsService } from '@/lib/services/events.service';
+import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
+import { businessProcessContent } from '@/lib/business-process-content';
 import { useStore } from '@/lib/store';
 
 interface ContractorForm {
@@ -220,6 +222,9 @@ export default function ContractorsPage() {
             Добавить контрагента
           </Button>
         </div>
+
+        {/* Business Process Description */}
+        <BusinessProcessInfo {...businessProcessContent.contractors} />
 
         {/* Contractors Table */}
         <Card padding="none">

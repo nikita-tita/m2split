@@ -6,6 +6,8 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Upload, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
+import { businessProcessContent } from '@/lib/business-process-content';
 
 export default function DocumentsPage() {
   const [activeTab, setActiveTab] = useState('contractors');
@@ -52,6 +54,9 @@ export default function DocumentsPage() {
             Управление первичной документацией по выплатам
           </p>
         </div>
+
+        {/* Business Process Description */}
+        <BusinessProcessInfo {...businessProcessContent.documents} />
 
         {/* Tabs */}
         <div className="border-b border-gray-200">

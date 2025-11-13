@@ -13,6 +13,8 @@ import { mockContractors } from '@/lib/mock-data';
 import { Registry, RegistryPaymentLine, RegistryStatus, ContractorRole, TaxRegime, VATRate, PaymentStatus } from '@/types';
 import { formatCurrency } from '@/lib/validations';
 import { eventsService } from '@/lib/services/events.service';
+import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
+import { businessProcessContent } from '@/lib/business-process-content';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -163,6 +165,9 @@ export default function NewRegistryPage() {
             </Button>
           </div>
         </div>
+
+        {/* Business Process Description */}
+        <BusinessProcessInfo {...businessProcessContent.registryCreation} />
 
         {/* Basic Info */}
         <Card>
