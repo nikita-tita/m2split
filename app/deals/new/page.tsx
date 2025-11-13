@@ -10,10 +10,11 @@ import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components
 import { ArrowLeft, Plus, Trash2, Info } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { mockContractors, mockUsers } from '@/lib/mock-data';
-import { Deal, DealShare, DealStatus, ContractorRole, TaxRegime, VATRate, Contractor, Project } from '@/types';
+import { Deal, DealShare, DealStatus, ContractorRole, TaxRegime, VATRate, Contractor, Project, Tariff } from '@/types';
 import { formatCurrency } from '@/lib/validations';
 import { counterpartiesService } from '@/lib/services/counterparties.service';
 import { projectsService } from '@/lib/services/projects.service';
+import { tariffsService } from '@/lib/services/tariffs.service';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -50,6 +51,10 @@ export default function NewDealPage() {
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
 
+  // Tariff and commission
+  const [selectedTariff, setSelectedTariff] = useState<Tariff | null>(null);
+  const [calculatedCommission, setCalculatedCommission] = useState<number>(0);
+
   const [shares, setShares] = useState<ShareForm[]>([]);
 
   // Load developers and projects on mount
@@ -81,6 +86,42 @@ export default function NewDealPage() {
       }
     }
   }, [selectedProjectId, projects]);
+
+  // Auto-find tariff and calculate commission when project is selected
+  useEffect(() => {
+    const findTariff = async () => {
+      if (selectedProjectId && selectedDeveloperId) {
+        try {
+          const tariff = await tariffsService.findBestTariff({
+            developerId: selectedDeveloperId,
+            projectId: selectedProjectId,
+          });
+
+          setSelectedTariff(tariff);
+
+          // Calculate commission if totalAmount is set
+          if (tariff && totalAmount) {
+            const commission = tariffsService.calculateCommission(
+              parseFloat(totalAmount),
+              tariff
+            );
+            setCalculatedCommission(commission);
+          } else {
+            setCalculatedCommission(0);
+          }
+        } catch (error) {
+          console.error('Failed to find tariff:', error);
+          setSelectedTariff(null);
+          setCalculatedCommission(0);
+        }
+      } else {
+        setSelectedTariff(null);
+        setCalculatedCommission(0);
+      }
+    };
+
+    findTariff();
+  }, [selectedProjectId, selectedDeveloperId, totalAmount]);
 
   const loadDevelopersAndProjects = async () => {
     try {
@@ -180,6 +221,9 @@ export default function NewDealPage() {
       clientName: clientName || undefined,
       clientPhone: clientPhone || undefined,
       clientEmail: clientEmail || undefined,
+      tariffId: selectedTariff?.id,
+      commissionCalculatedAmount: calculatedCommission || undefined,
+      commissionActualAmount: calculatedCommission || undefined,
       responsibleUserId: '2',
       initiator: {
         role: 'M2_OPERATOR',
@@ -283,7 +327,7 @@ export default function NewDealPage() {
                 onChange={(e) => setLotNumber(e.target.value)}
               />
               <Input
-                label="Сумма комиссии (₽)"
+                label="Сумма договора с застройщиком (₽)"
                 type="number"
                 placeholder="15000000"
                 value={totalAmount}
@@ -305,6 +349,38 @@ export default function NewDealPage() {
                 onChange={(e) => setContractDate(e.target.value)}
               />
             </div>
+
+            {/* Tariff and Commission Calculation */}
+            {selectedTariff && totalAmount && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="text-sm font-semibold text-blue-900 mb-2">
+                  Расчет комиссии КВН
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Тариф:</span>
+                    <span className="font-medium text-gray-900">
+                      {tariffsService.getTariffDisplayInfo(selectedTariff)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Сумма договора:</span>
+                    <span className="font-medium text-gray-900">
+                      {formatCurrency(parseFloat(totalAmount))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-blue-200">
+                    <span className="font-semibold text-blue-900">Комиссия КВН:</span>
+                    <span className="font-bold text-blue-900">
+                      {formatCurrency(calculatedCommission)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-700 mt-2">
+                    * Расчет на основе уникального клиента (максимальный тариф)
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
 
