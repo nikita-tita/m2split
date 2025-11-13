@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
 import { mockPayments, mockContractors } from '@/lib/mock-data';
 import { formatCurrency, formatDateTime } from '@/lib/validations';
+import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
+import { businessProcessContent } from '@/lib/business-process-content';
 
 export default function PaymentsPage() {
   const payments = mockPayments;
@@ -20,6 +22,9 @@ export default function PaymentsPage() {
             Мониторинг статусов выплат от банка
           </p>
         </div>
+
+        {/* Business Process Description */}
+        <BusinessProcessInfo {...businessProcessContent.payments} />
 
         <Card padding="none">
           <Table>

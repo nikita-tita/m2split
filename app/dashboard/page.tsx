@@ -20,6 +20,8 @@ import {
 import { useStore } from '@/lib/store';
 import { mockDashboardMetrics, mockDeals, mockPayments } from '@/lib/mock-data';
 import { formatCurrency, formatDate } from '@/lib/validations';
+import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
+import { businessProcessContent } from '@/lib/business-process-content';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -95,6 +97,9 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Business Process Overview */}
+        <BusinessProcessInfo {...businessProcessContent.overview} defaultExpanded={false} />
 
         {/* Metrics - Full view for Developer/M2 */}
         {showFullMetrics && (

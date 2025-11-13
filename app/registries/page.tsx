@@ -10,6 +10,8 @@ import { Plus, Download } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { formatCurrency, formatDate } from '@/lib/validations';
 import { downloadRegistryCSV, downloadRegistryJSON } from '@/lib/export';
+import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
+import { businessProcessContent } from '@/lib/business-process-content';
 import Link from 'next/link';
 
 export default function RegistriesPage() {
@@ -55,6 +57,9 @@ export default function RegistriesPage() {
             </Button>
           </Link>
         </div>
+
+        {/* Business Process Description */}
+        <BusinessProcessInfo {...businessProcessContent.registriesList} />
 
         <Card padding="none">
           <Table>
