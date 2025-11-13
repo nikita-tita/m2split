@@ -2,25 +2,72 @@ import { supabase, getSupabaseClient, isSupabaseConfigured } from '@/lib/supabas
 import { Tariff, Segment, ObjectCategory, PaymentStage } from '@/types';
 
 // Mock tariffs for development without Supabase
+// Universal tariff applies to all developers and projects as fallback
 const mockTariffs: Tariff[] = [
+  // Universal tariff for all developers (fallback)
   {
-    id: 'tariff-1',
+    id: 'tariff-universal',
+    tariffId: 'TAR-UNIVERSAL-BASE',
+    developerId: undefined, // Applies to all
+    developerName: 'Все застройщики',
+    projectId: undefined, // Applies to all projects
+    projectName: 'Все проекты',
+    region: 'Москва',
+    city: 'Москва',
+    segment: 'FLATS',
+    objectCategory: undefined, // Any category
+    paymentStage: 'ADVANCE',
+    commissionSchemeType: 'PERCENT_OF_CONTRACT',
+    commissionTotalPercent: 2.5, // Base rate for unique client
+    promoFlag: 'BASE',
+    validFrom: new Date('2025-01-01'),
+    validTo: new Date('2025-12-31'),
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+
+  // Specific tariff for Группа «Самолет»
+  {
+    id: 'tariff-samolot',
     tariffId: 'TAR-SAMOLET-BASE',
-    developerId: 'dev-samolet',
+    developerId: 'dev-samolot',
     developerName: 'Группа «Самолет»',
-    developerLegalEntity: 'ООО «Самолет»',
     projectId: 'prj-kvartal-domashniy',
     projectName: 'ЖК «Квартал Домашний»',
     region: 'Москва',
     city: 'Москва',
     segment: 'FLATS',
-    objectCategory: '1_ROOM',
+    objectCategory: undefined,
     paymentStage: 'ADVANCE',
     commissionSchemeType: 'PERCENT_OF_CONTRACT',
-    commissionTotalPercent: 2.7, // Maximum rate
+    commissionTotalPercent: 2.7, // Higher rate for Samolet
     promoFlag: 'BASE',
     validFrom: new Date('2025-01-01'),
     validTo: new Date('2025-11-30'),
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+
+  // Level Group tariff
+  {
+    id: 'tariff-level',
+    tariffId: 'TAR-LEVEL-BASE',
+    developerId: 'dev-level',
+    developerName: 'Level Group',
+    projectId: undefined, // All Level Group projects
+    projectName: undefined,
+    region: 'Москва',
+    city: 'Москва',
+    segment: 'FLATS',
+    objectCategory: undefined,
+    paymentStage: 'ADVANCE',
+    commissionSchemeType: 'PERCENT_OF_CONTRACT',
+    commissionTotalPercent: 3.0, // Premium rate
+    promoFlag: 'BASE',
+    validFrom: new Date('2025-01-01'),
+    validTo: new Date('2025-12-31'),
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -44,11 +91,12 @@ class TariffsService {
     if (!isSupabaseConfigured()) {
       console.log('Using mock tariffs');
       return mockTariffs.filter(t => {
-        if (filters?.developerId && t.developerId !== filters.developerId) return false;
-        if (filters?.projectId && t.projectId !== filters.projectId) return false;
-        if (filters?.segment && t.segment !== filters.segment) return false;
-        if (filters?.objectCategory && t.objectCategory !== filters.objectCategory) return false;
-        if (filters?.paymentStage && t.paymentStage !== filters.paymentStage) return false;
+        // Universal tariff (undefined developerId/projectId) matches any filter
+        if (filters?.developerId && t.developerId && t.developerId !== filters.developerId) return false;
+        if (filters?.projectId && t.projectId && t.projectId !== filters.projectId) return false;
+        if (filters?.segment && t.segment && t.segment !== filters.segment) return false;
+        if (filters?.objectCategory && t.objectCategory && t.objectCategory !== filters.objectCategory) return false;
+        if (filters?.paymentStage && t.paymentStage && t.paymentStage !== filters.paymentStage) return false;
         if (filters?.isActive !== undefined && t.isActive !== filters.isActive) return false;
         return true;
       });
