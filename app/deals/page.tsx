@@ -8,16 +8,15 @@ import { Input, Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
 import { Plus, Search, Download } from 'lucide-react';
-import { mockDeals } from '@/lib/mock-data';
+import { useStore } from '@/lib/store';
 import { formatCurrency, formatDate } from '@/lib/validations';
 import { downloadDealsCSV } from '@/lib/export';
 import Link from 'next/link';
 
 export default function DealsPage() {
+  const { deals } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-
-  const deals = mockDeals;
 
   const filteredDeals = deals.filter((deal) => {
     const matchesSearch =
