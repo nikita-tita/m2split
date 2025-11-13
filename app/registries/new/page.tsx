@@ -12,6 +12,7 @@ import { useStore } from '@/lib/store';
 import { mockContractors } from '@/lib/mock-data';
 import { Registry, RegistryPaymentLine, RegistryStatus, ContractorRole, TaxRegime, VATRate, PaymentStatus } from '@/types';
 import { formatCurrency } from '@/lib/validations';
+import { eventsService } from '@/lib/services/events.service';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -115,6 +116,24 @@ export default function NewRegistryPage() {
     };
 
     addRegistry(newRegistry);
+
+    // Log registry creation event
+    eventsService.logEvent({
+      type: 'REGISTRY_CREATED',
+      entityType: 'REGISTRY',
+      entityId: registryId,
+      userId: '2', // TODO: Get from auth
+      userName: 'M2 Operator',
+      userRole: 'M2_OPERATOR',
+      description: `Реестр создан: ${registryNumber}`,
+      metadata: {
+        registryNumber,
+        totalAmount,
+        linesCount: lines.length,
+        date: registryDate,
+      },
+    });
+
     router.push(`/registries/${registryId}`);
   };
 
