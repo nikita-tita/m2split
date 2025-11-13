@@ -36,7 +36,12 @@ export function RoleSwitcher() {
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         className="w-full flex items-center justify-between px-3 py-2 text-sm bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
       >
         <div className="flex items-center min-w-0 flex-1">
@@ -60,10 +65,14 @@ export function RoleSwitcher() {
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
+            className="fixed inset-0 z-[9998]"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsOpen(false);
+            }}
           />
-          <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+          <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[9999] max-h-96 overflow-auto">
             <div className="px-3 py-2 border-b border-gray-100">
               <p className="text-xs font-medium text-gray-500 uppercase">
                 Переключить роль
@@ -72,7 +81,10 @@ export function RoleSwitcher() {
             {roles.map((role) => (
               <button
                 key={role.value}
-                onClick={() => {
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   switchRole(role.value);
                   setIsOpen(false);
                 }}
