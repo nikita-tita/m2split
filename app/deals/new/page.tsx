@@ -432,7 +432,7 @@ export default function NewDealPage() {
               onChange={(e) => setObjectName(e.target.value)}
               required
               disabled={!selectedProjectId}
-              helpText={selectedApartmentId ? "Заполнено автоматически на основе выбранной квартиры" : ""}
+              helperText={selectedApartmentId ? "Заполнено автоматически на основе выбранной квартиры" : ""}
             />
             <Input
               label="Адрес объекта"
@@ -441,7 +441,7 @@ export default function NewDealPage() {
               onChange={(e) => setObjectAddress(e.target.value)}
               required
               disabled={!selectedProjectId}
-              helpText={selectedApartmentId ? "Заполнено автоматически" : ""}
+              helperText={selectedApartmentId ? "Заполнено автоматически" : ""}
             />
             <div className="grid grid-cols-2 gap-4">
               <Input
@@ -450,7 +450,7 @@ export default function NewDealPage() {
                 value={lotNumber}
                 onChange={(e) => setLotNumber(e.target.value)}
                 disabled={!!selectedApartmentId}
-                helpText={selectedApartmentId ? "Заполнено автоматически" : ""}
+                helperText={selectedApartmentId ? "Заполнено автоматически" : ""}
               />
               <Input
                 label="Сумма договора с застройщиком (₽)"
@@ -460,7 +460,7 @@ export default function NewDealPage() {
                 onChange={(e) => setTotalAmount(e.target.value)}
                 required
                 disabled={!!selectedApartmentId}
-                helpText={selectedApartmentId ? "Заполнено автоматически (цена квартиры)" : ""}
+                helperText={selectedApartmentId ? "Заполнено автоматически (цена квартиры)" : ""}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
