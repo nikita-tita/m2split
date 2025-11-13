@@ -15,10 +15,18 @@ export interface Settings {
   ipWhitelist: string;
 }
 
+export type UserRole =
+  | 'DEVELOPER_ADMIN'     // Застройщик-Админ
+  | 'M2_OPERATOR'         // М2-Оператор
+  | 'AGENCY_ADMIN'        // АН-Админ
+  | 'CONTRACTOR';         // Агент/ИП/НПД
+
 interface AppState {
-  // Current user
+  // Current user and role
   currentUser: User | null;
+  currentRole: UserRole;
   setCurrentUser: (user: User | null) => void;
+  switchRole: (role: UserRole) => void;
 
   // Deals
   deals: Deal[];
@@ -49,9 +57,11 @@ interface AppState {
 }
 
 export const useStore = create<AppState>((set) => ({
-  // Current user
+  // Current user and role
   currentUser: null,
+  currentRole: 'M2_OPERATOR', // Default role
   setCurrentUser: (user) => set({ currentUser: user }),
+  switchRole: (role) => set({ currentRole: role }),
 
   // Deals
   deals: [],
