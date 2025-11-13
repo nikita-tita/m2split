@@ -43,12 +43,16 @@ export default function NewDealPage() {
   const isAgencyAdmin = currentRole === 'AGENCY_ADMIN';
   const isContractor = currentRole === 'CONTRACTOR';
 
-  // Developer & Project (only for M2 Operator)
+  // Developer & Project
   const [developers, setDevelopers] = useState<Contractor[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedDeveloperId, setSelectedDeveloperId] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
+
+  // Apartments
+  const [selectedApartmentId, setSelectedApartmentId] = useState('');
+  const [availableApartments, setAvailableApartments] = useState<any[]>([]);
 
   const [objectName, setObjectName] = useState('');
   const [objectAddress, setObjectAddress] = useState('');
@@ -75,12 +79,12 @@ export default function NewDealPage() {
     }
   }, [canCreateDeal, router]);
 
-  // Load developers and projects on mount (only for M2 Operator)
+  // Load developers and projects on mount (for all roles who can create deals)
   useEffect(() => {
-    if (isM2Operator) {
+    if (canCreateDeal) {
       loadDevelopersAndProjects();
     }
-  }, [isM2Operator]);
+  }, [canCreateDeal]);
 
   // Filter projects when developer changes
   useEffect(() => {
@@ -92,20 +96,45 @@ export default function NewDealPage() {
     }
     // Reset project selection when developer changes
     setSelectedProjectId('');
+    setSelectedApartmentId('');
+    setAvailableApartments([]);
     setObjectName('');
     setObjectAddress('');
+    setLotNumber('');
   }, [selectedDeveloperId, projects]);
 
-  // Auto-fill object info from selected project
+  // Load apartments when project changes
   useEffect(() => {
     if (selectedProjectId) {
       const project = projects.find(p => p.id === selectedProjectId);
-      if (project) {
-        setObjectName(project.projectName);
-        setObjectAddress(project.address || `${project.city}, ${project.region}`);
+      if (project && project.apartments) {
+        setAvailableApartments(project.apartments.filter(a => a.status === 'AVAILABLE'));
+      } else {
+        setAvailableApartments([]);
+      }
+    } else {
+      setAvailableApartments([]);
+    }
+    // Reset apartment selection when project changes
+    setSelectedApartmentId('');
+  }, [selectedProjectId, projects]);
+
+  // Auto-fill when apartment is selected
+  useEffect(() => {
+    if (selectedApartmentId && availableApartments.length > 0) {
+      const apartment = availableApartments.find(a => a.id === selectedApartmentId);
+      if (apartment) {
+        setLotNumber(apartment.lotNumber);
+        setObjectName(`${apartment.roomType === 'STUDIO' ? 'Студия' :
+          apartment.roomType === '1_ROOM' ? '1-комнатная' :
+          apartment.roomType === '2_ROOM' ? '2-комнатная' :
+          apartment.roomType === '3_ROOM' ? '3-комнатная' :
+          '4-комнатная'} ${apartment.area} м²`);
+        setObjectAddress(apartment.address);
+        setTotalAmount(apartment.price.toString());
       }
     }
-  }, [selectedProjectId, projects]);
+  }, [selectedApartmentId, availableApartments]);
 
   // Auto-find tariff and calculate commission when project is selected
   useEffect(() => {
@@ -333,8 +362,8 @@ export default function NewDealPage() {
         {isContractor && (
           <OnboardingTip
             id="contractor-deal-form"
-            title="✏️ Заполните данные сделки"
-            description="Укажите объект недвижимости, сумму договора с клиентом и данные клиента. Система автоматически рассчитает комиссию КВН на основе тарифа М2 с застройщиком. Затем вы сможете распределить доли между участниками (агентство, агенты, ИП)."
+            title="🏠 Выберите застройщика, ЖК и квартиру"
+            description="Сначала выберите застройщика, затем ЖК (проект), затем квартиру из списка доступных. Все данные (название, адрес, лот, цена) заполнятся автоматически! Система рассчитает комиссию КВН по тарифу М2 с застройщиком, и вы сможете распределить доли между участниками."
           />
         )}
 
@@ -345,45 +374,65 @@ export default function NewDealPage() {
         <Card>
           <CardHeader title="Основная информация" />
           <div className="space-y-4">
-            {/* Only M2 Operator can select developer and project */}
-            {isM2Operator && (
-              <div className="grid grid-cols-2 gap-4">
-                <Select
-                  label="Застройщик"
-                  value={selectedDeveloperId}
-                  onChange={(e) => setSelectedDeveloperId(e.target.value)}
-                  options={[
-                    { value: '', label: 'Выберите застройщика' },
-                    ...developers.map(d => ({
-                      value: d.id,
-                      label: d.name
-                    }))
-                  ]}
-                  required
-                />
-                <Select
-                  label="Проект / ЖК"
-                  value={selectedProjectId}
-                  onChange={(e) => setSelectedProjectId(e.target.value)}
-                  options={[
-                    { value: '', label: selectedDeveloperId ? 'Выберите проект' : 'Сначала выберите застройщика' },
-                    ...filteredProjects.map(p => ({
-                      value: p.id,
-                      label: p.projectName
-                    }))
-                  ]}
-                  required
-                  disabled={!selectedDeveloperId}
-                />
-              </div>
+            {/* Developer and project selection for all roles */}
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                label="Застройщик"
+                value={selectedDeveloperId}
+                onChange={(e) => setSelectedDeveloperId(e.target.value)}
+                options={[
+                  { value: '', label: 'Выберите застройщика' },
+                  ...developers.map(d => ({
+                    value: d.id,
+                    label: d.name
+                  }))
+                ]}
+                required
+              />
+              <Select
+                label="Проект / ЖК"
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                options={[
+                  { value: '', label: selectedDeveloperId ? 'Выберите проект' : 'Сначала выберите застройщика' },
+                  ...filteredProjects.map(p => ({
+                    value: p.id,
+                    label: p.projectName
+                  }))
+                ]}
+                required
+                disabled={!selectedDeveloperId}
+              />
+            </div>
+
+            {/* Apartment selection */}
+            {selectedProjectId && availableApartments.length > 0 && (
+              <Select
+                label="Квартира"
+                value={selectedApartmentId}
+                onChange={(e) => setSelectedApartmentId(e.target.value)}
+                options={[
+                  { value: '', label: 'Выберите квартиру' },
+                  ...availableApartments.map(a => ({
+                    value: a.id,
+                    label: `${a.lotNumber} — ${a.roomType === 'STUDIO' ? 'Студия' :
+                      a.roomType === '1_ROOM' ? '1к' :
+                      a.roomType === '2_ROOM' ? '2к' :
+                      a.roomType === '3_ROOM' ? '3к' : '4к'}, ${a.area} м², ${a.floor} этаж — ${(a.price / 1000000).toFixed(1)} млн ₽`
+                  }))
+                ]}
+                required
+              />
             )}
+
             <Input
               label="Название объекта"
               placeholder="ЖК Солнечный"
               value={objectName}
               onChange={(e) => setObjectName(e.target.value)}
               required
-              disabled={isM2Operator && !selectedProjectId}
+              disabled={!selectedProjectId}
+              helpText={selectedApartmentId ? "Заполнено автоматически на основе выбранной квартиры" : ""}
             />
             <Input
               label="Адрес объекта"
@@ -391,7 +440,8 @@ export default function NewDealPage() {
               value={objectAddress}
               onChange={(e) => setObjectAddress(e.target.value)}
               required
-              disabled={isM2Operator && !selectedProjectId}
+              disabled={!selectedProjectId}
+              helpText={selectedApartmentId ? "Заполнено автоматически" : ""}
             />
             <div className="grid grid-cols-2 gap-4">
               <Input
@@ -399,6 +449,8 @@ export default function NewDealPage() {
                 placeholder="Кв. 45"
                 value={lotNumber}
                 onChange={(e) => setLotNumber(e.target.value)}
+                disabled={!!selectedApartmentId}
+                helpText={selectedApartmentId ? "Заполнено автоматически" : ""}
               />
               <Input
                 label="Сумма договора с застройщиком (₽)"
@@ -407,6 +459,8 @@ export default function NewDealPage() {
                 value={totalAmount}
                 onChange={(e) => setTotalAmount(e.target.value)}
                 required
+                disabled={!!selectedApartmentId}
+                helpText={selectedApartmentId ? "Заполнено автоматически (цена квартиры)" : ""}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
