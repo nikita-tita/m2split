@@ -1,17 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Info } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { mockContractors, mockUsers } from '@/lib/mock-data';
-import { Deal, DealShare, DealStatus, ContractorRole, TaxRegime, VATRate } from '@/types';
+import { Deal, DealShare, DealStatus, ContractorRole, TaxRegime, VATRate, Contractor, Project } from '@/types';
 import { formatCurrency } from '@/lib/validations';
+import { counterpartiesService } from '@/lib/services/counterparties.service';
+import { projectsService } from '@/lib/services/projects.service';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -29,6 +31,13 @@ export default function NewDealPage() {
   const router = useRouter();
   const { addDeal } = useStore();
 
+  // Developer & Project
+  const [developers, setDevelopers] = useState<Contractor[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedDeveloperId, setSelectedDeveloperId] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
+
   const [objectName, setObjectName] = useState('');
   const [objectAddress, setObjectAddress] = useState('');
   const [lotNumber, setLotNumber] = useState('');
@@ -42,6 +51,56 @@ export default function NewDealPage() {
   const [clientEmail, setClientEmail] = useState('');
 
   const [shares, setShares] = useState<ShareForm[]>([]);
+
+  // Load developers and projects on mount
+  useEffect(() => {
+    loadDevelopersAndProjects();
+  }, []);
+
+  // Filter projects when developer changes
+  useEffect(() => {
+    if (selectedDeveloperId) {
+      const filtered = projects.filter(p => p.developerId === selectedDeveloperId);
+      setFilteredProjects(filtered);
+    } else {
+      setFilteredProjects([]);
+    }
+    // Reset project selection when developer changes
+    setSelectedProjectId('');
+    setObjectName('');
+    setObjectAddress('');
+  }, [selectedDeveloperId, projects]);
+
+  // Auto-fill object info from selected project
+  useEffect(() => {
+    if (selectedProjectId) {
+      const project = projects.find(p => p.id === selectedProjectId);
+      if (project) {
+        setObjectName(project.projectName);
+        setObjectAddress(project.address || `${project.city}, ${project.region}`);
+      }
+    }
+  }, [selectedProjectId, projects]);
+
+  const loadDevelopersAndProjects = async () => {
+    try {
+      // Load developers
+      const devData = await counterpartiesService.getCounterparties({
+        type: 'DEVELOPER',
+        offerAccepted: true,
+      });
+      setDevelopers(devData);
+
+      // Load projects (Moscow only)
+      const projData = await projectsService.getProjects({
+        city: 'Москва',
+        isActive: true,
+      });
+      setProjects(projData);
+    } catch (error) {
+      console.error('Failed to load developers/projects:', error);
+    }
+  };
 
   const addShare = () => {
     setShares([...shares, {
@@ -111,7 +170,8 @@ export default function NewDealPage() {
       objectName,
       objectAddress,
       lotNumber: lotNumber || undefined,
-      developerId: '1',
+      developerId: selectedDeveloperId || undefined,
+      projectId: selectedProjectId || undefined,
       totalAmount: amount,
       status: 'DRAFT' as DealStatus,
       shares: dealShares,
@@ -150,6 +210,10 @@ export default function NewDealPage() {
               <p className="mt-1 text-sm text-gray-500">
                 Укажите объект и распределите доли между участниками
               </p>
+              <div className="mt-2 flex items-center gap-2 text-sm text-blue-600">
+                <Info className="w-4 h-4" />
+                <span>Система работает только для объектов в Москве</span>
+              </div>
             </div>
           </div>
           <div className="flex gap-3">
@@ -166,12 +230,42 @@ export default function NewDealPage() {
         <Card>
           <CardHeader title="Основная информация" />
           <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                label="Застройщик"
+                value={selectedDeveloperId}
+                onChange={(e) => setSelectedDeveloperId(e.target.value)}
+                options={[
+                  { value: '', label: 'Выберите застройщика' },
+                  ...developers.map(d => ({
+                    value: d.id,
+                    label: d.name
+                  }))
+                ]}
+                required
+              />
+              <Select
+                label="Проект / ЖК"
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                options={[
+                  { value: '', label: selectedDeveloperId ? 'Выберите проект' : 'Сначала выберите застройщика' },
+                  ...filteredProjects.map(p => ({
+                    value: p.id,
+                    label: p.projectName
+                  }))
+                ]}
+                required
+                disabled={!selectedDeveloperId}
+              />
+            </div>
             <Input
               label="Название объекта"
               placeholder="ЖК Солнечный"
               value={objectName}
               onChange={(e) => setObjectName(e.target.value)}
               required
+              disabled={!selectedProjectId}
             />
             <Input
               label="Адрес объекта"
@@ -179,6 +273,7 @@ export default function NewDealPage() {
               value={objectAddress}
               onChange={(e) => setObjectAddress(e.target.value)}
               required
+              disabled={!selectedProjectId}
             />
             <div className="grid grid-cols-2 gap-4">
               <Input
