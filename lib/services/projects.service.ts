@@ -1,122 +1,71 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { Project, Apartment } from '@/types';
 
-// Mock apartments for projects
-const mockApartmentsKvartal: Apartment[] = [
-  {
-    id: 'apt-kvartal-1',
-    projectId: 'prj-kvartal-domashniy',
-    lotNumber: '12-345',
-    roomType: 'STUDIO',
-    area: 28.5,
-    floor: 5,
-    section: 'А',
-    price: 8500000,
-    status: 'AVAILABLE',
-    address: 'ЖК «Квартал Домашний», ул. Донецкая, корпус А, кв. 12-345',
-  },
-  {
-    id: 'apt-kvartal-2',
-    projectId: 'prj-kvartal-domashniy',
-    lotNumber: '14-267',
-    roomType: '1_ROOM',
-    area: 42.3,
-    floor: 8,
-    section: 'Б',
-    price: 12300000,
-    status: 'AVAILABLE',
-    address: 'ЖК «Квартал Домашний», ул. Донецкая, корпус Б, кв. 14-267',
-  },
-  {
-    id: 'apt-kvartal-3',
-    projectId: 'prj-kvartal-domashniy',
-    lotNumber: '15-189',
-    roomType: '2_ROOM',
-    area: 65.7,
-    floor: 12,
-    section: 'А',
-    price: 18900000,
-    status: 'AVAILABLE',
-    address: 'ЖК «Квартал Домашний», ул. Донецкая, корпус А, кв. 15-189',
-  },
-  {
-    id: 'apt-kvartal-4',
-    projectId: 'prj-kvartal-domashniy',
-    lotNumber: '16-034',
-    roomType: '3_ROOM',
-    area: 89.2,
-    floor: 7,
-    section: 'Б',
-    price: 25600000,
-    status: 'AVAILABLE',
-    address: 'ЖК «Квартал Домашний», ул. Донецкая, корпус Б, кв. 16-034',
-  },
-];
+/**
+ * Generate mock apartments for any project
+ * Creates realistic apartments: studio, 1-room, 2-room, 3-room
+ */
+function generateMockApartments(project: Project): Apartment[] {
+  const apartments: Apartment[] = [];
+  const sections = ['А', 'Б', 'В', '1', '2', '3'];
 
-const mockApartmentsSoyuz: Apartment[] = [
-  {
-    id: 'apt-soyuz-1',
-    projectId: 'prj-soyuz',
-    lotNumber: '03-112',
-    roomType: 'STUDIO',
-    area: 30.1,
-    floor: 3,
-    section: '1',
-    price: 7200000,
-    status: 'AVAILABLE',
-    address: 'ЖК «СОЮЗ», ул. Сельскохозяйственная, корпус 1, кв. 03-112',
-  },
-  {
-    id: 'apt-soyuz-2',
-    projectId: 'prj-soyuz',
-    lotNumber: '05-278',
-    roomType: '1_ROOM',
-    area: 45.8,
-    floor: 9,
-    section: '2',
-    price: 11500000,
-    status: 'AVAILABLE',
-    address: 'ЖК «СОЮЗ», ул. Сельскохозяйственная, корпус 2, кв. 05-278',
-  },
-  {
-    id: 'apt-soyuz-3',
-    projectId: 'prj-soyuz',
-    lotNumber: '07-145',
-    roomType: '2_ROOM',
-    area: 68.4,
-    floor: 15,
-    section: '1',
-    price: 17800000,
-    status: 'AVAILABLE',
-    address: 'ЖК «СОЮЗ», ул. Сельскохозяйственная, корпус 1, кв. 07-145',
-  },
-  {
-    id: 'apt-soyuz-4',
-    projectId: 'prj-soyuz',
-    lotNumber: '08-056',
-    roomType: '3_ROOM',
-    area: 92.6,
-    floor: 11,
-    section: '2',
-    price: 24200000,
-    status: 'AVAILABLE',
-    address: 'ЖК «СОЮЗ», ул. Сельскохозяйственная, корпус 2, кв. 08-056',
-  },
-  {
-    id: 'apt-soyuz-5',
-    projectId: 'prj-soyuz',
-    lotNumber: '09-023',
-    roomType: '4_ROOM',
-    area: 115.3,
-    floor: 18,
-    section: '1',
-    price: 32100000,
-    status: 'AVAILABLE',
-    address: 'ЖК «СОЮЗ», ул. Сельскохозяйственная, корпус 1, кв. 09-023',
-  },
-];
+  // Simple hash function to get consistent random values for each project
+  const hash = (str: string) => {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+      h = ((h << 5) - h) + str.charCodeAt(i);
+      h = h & h;
+    }
+    return Math.abs(h);
+  };
 
-// Mock projects for fallback
+  const projectHash = hash(project.id + project.projectName);
+  const basePrice = 250000 + (projectHash % 100000); // 250k-350k per sqm
+
+  // Helper to generate random value in range
+  const randRange = (min: number, max: number, seed: number) => {
+    return min + ((seed % 1000) / 1000) * (max - min);
+  };
+
+  const types = [
+    { type: 'STUDIO' as const, count: 1, areaMin: 28, areaMax: 35, label: 'Студия' },
+    { type: '1_ROOM' as const, count: 2, areaMin: 38, areaMax: 52, label: '1-комнатная' },
+    { type: '2_ROOM' as const, count: 2, areaMin: 55, areaMax: 75, label: '2-комнатная' },
+    { type: '3_ROOM' as const, count: 2, areaMin: 80, areaMax: 100, label: '3-комнатная' },
+  ];
+
+  let aptIndex = 0;
+
+  types.forEach(({ type, count, areaMin, areaMax, label }) => {
+    for (let i = 0; i < count; i++) {
+      const seed = projectHash + aptIndex * 137;
+      const area = Math.round(randRange(areaMin, areaMax, seed) * 10) / 10;
+      const price = Math.round(area * basePrice / 100000) * 100000; // Round to 100k
+      const floor = Math.floor(randRange(3, 18, seed + 1));
+      const section = sections[seed % sections.length];
+      const lotNum = `${String(floor).padStart(2, '0')}-${String(100 + aptIndex).slice(-3)}`;
+
+      apartments.push({
+        id: `apt-${project.id}-${aptIndex}`,
+        projectId: project.id,
+        lotNumber: lotNum,
+        roomType: type,
+        area,
+        floor,
+        section,
+        price,
+        status: 'AVAILABLE',
+        address: `${project.projectName}, ${project.address}, корп. ${section}, кв. ${lotNum}`,
+      });
+
+      aptIndex++;
+    }
+  });
+
+  return apartments;
+}
+
+// Mock projects for fallback (when Supabase is not configured)
 const mockProjects: Project[] = [
   {
     id: 'prj-kvartal-domashniy',
@@ -126,7 +75,7 @@ const mockProjects: Project[] = [
     city: 'Москва',
     address: 'ул. Донецкая',
     isActive: true,
-    apartments: mockApartmentsKvartal,
+    apartments: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -138,11 +87,16 @@ const mockProjects: Project[] = [
     city: 'Москва',
     address: 'ул. Сельскохозяйственная',
     isActive: true,
-    apartments: mockApartmentsSoyuz,
+    apartments: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   },
 ];
+
+// Generate apartments for mock projects
+mockProjects.forEach(project => {
+  project.apartments = generateMockApartments(project);
+});
 
 class ProjectsService {
   /**
@@ -178,7 +132,13 @@ class ProjectsService {
 
       if (error) throw error;
 
-      return (data || []).map(this.transformFromDB);
+      // Transform projects and add mock apartments to each
+      const projects = (data || []).map(this.transformFromDB);
+      projects.forEach(project => {
+        project.apartments = generateMockApartments(project);
+      });
+
+      return projects;
     } catch (error) {
       console.error('Error fetching projects:', error);
       throw error;
@@ -203,7 +163,10 @@ class ProjectsService {
       if (error) throw error;
       if (!data) return null;
 
-      return this.transformFromDB(data);
+      const project = this.transformFromDB(data);
+      project.apartments = generateMockApartments(project);
+
+      return project;
     } catch (error) {
       console.error('Error fetching project:', error);
       return null;
