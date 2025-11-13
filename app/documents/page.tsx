@@ -62,7 +62,7 @@ export default function DocumentsPage() {
             <Card>
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="font-medium text-gray-900">АН "Недвижимость Плюс"</h3>
+                  <h3 className="font-medium text-gray-900">АН &quot;Недвижимость Плюс&quot;</h3>
                   <p className="text-sm text-gray-500 mt-1">НДС 20%</p>
                 </div>
                 <Badge variant="success">Загружено</Badge>

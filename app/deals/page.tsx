@@ -111,7 +111,7 @@ export default function DealsPage() {
                 <TableCell header>Участников</TableCell>
                 <TableCell header>Статус</TableCell>
                 <TableCell header>Дата создания</TableCell>
-                <TableCell header></TableCell>
+                <TableCell header> </TableCell>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -16,8 +16,8 @@ export type VATRate = 0 | 10 | 20 | 22;
 // Contractor roles
 export type ContractorRole = 'AGENCY' | 'AGENT' | 'IP' | 'NPD';
 
-// Deal statuses (extended with APPROVED)
-export type DealStatus = 'DRAFT' | 'IN_REGISTRY' | 'APPROVED' | 'SENT_TO_BANK' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED';
+// Deal statuses (extended with APPROVED and IN_PROGRESS)
+export type DealStatus = 'DRAFT' | 'IN_PROGRESS' | 'IN_REGISTRY' | 'APPROVED' | 'SENT_TO_BANK' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED';
 
 // Registry statuses
 export type RegistryStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'SENT_TO_BANK' | 'EXECUTED' | 'PARTIALLY_EXECUTED' | 'ERROR';

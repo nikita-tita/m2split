@@ -66,7 +66,7 @@ export default function RegistriesPage() {
                 <TableCell header>Сумма</TableCell>
                 <TableCell header>Статус</TableCell>
                 <TableCell header>Утверждён</TableCell>
-                <TableCell header></TableCell>
+                <TableCell header> </TableCell>
               </TableRow>
             </TableHeader>
             <TableBody>

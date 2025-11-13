@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardHeader } from '@/components/ui/Card';
@@ -11,8 +9,11 @@ import { mockDeals } from '@/lib/mock-data';
 import { formatCurrency, formatDate, getTaxRegimeLabel } from '@/lib/validations';
 import Link from 'next/link';
 
-// Dynamic route with client-side rendering
-export const dynamic = 'force-dynamic';
+export async function generateStaticParams() {
+  return mockDeals.map((deal) => ({
+    id: deal.id,
+  }));
+}
 
 export default function DealDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
@@ -157,7 +158,7 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
                 <TableCell header>Режим</TableCell>
                 <TableCell header>Ставка НДС</TableCell>
                 <TableCell header>Договор</TableCell>
-                <TableCell header></TableCell>
+                <TableCell header> </TableCell>
               </TableRow>
             </TableHeader>
             <TableBody>
