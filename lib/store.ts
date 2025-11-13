@@ -1,6 +1,20 @@
 import { create } from 'zustand';
 import { User, Deal, Registry, Contractor, Payment } from '@/types';
 
+export interface Settings {
+  companyName: string;
+  inn: string;
+  kpp: string;
+  address: string;
+  currentAccount: string;
+  specialAccount: string;
+  bik: string;
+  bankName: string;
+  apiKey: string;
+  webhookUrl: string;
+  ipWhitelist: string;
+}
+
 interface AppState {
   // Current user
   currentUser: User | null;
@@ -28,6 +42,10 @@ interface AppState {
   payments: Payment[];
   setPayments: (payments: Payment[]) => void;
   updatePayment: (id: string, payment: Partial<Payment>) => void;
+
+  // Settings
+  settings: Settings;
+  updateSettings: (settings: Partial<Settings>) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -64,5 +82,23 @@ export const useStore = create<AppState>((set) => ({
   setPayments: (payments) => set({ payments }),
   updatePayment: (id, paymentUpdate) => set((state) => ({
     payments: state.payments.map((p) => p.id === id ? { ...p, ...paymentUpdate } : p)
+  })),
+
+  // Settings
+  settings: {
+    companyName: "ООО 'СтройДевелопмент'",
+    inn: '7701234567',
+    kpp: '770101001',
+    address: 'г. Москва, ул. Строителей, д. 1',
+    currentAccount: '40702810100000001234',
+    specialAccount: '40702810200000002345',
+    bik: '044525225',
+    bankName: 'ПАО Сбербанк',
+    apiKey: 'sk_test_••••••••••••••••',
+    webhookUrl: '',
+    ipWhitelist: '',
+  },
+  updateSettings: (settingsUpdate) => set((state) => ({
+    settings: { ...state.settings, ...settingsUpdate }
   })),
 }));

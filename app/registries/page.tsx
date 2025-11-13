@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
 import { Plus, Download } from 'lucide-react';
-import { mockRegistries } from '@/lib/mock-data';
+import { useStore } from '@/lib/store';
 import { formatCurrency, formatDate } from '@/lib/validations';
 import { downloadRegistryCSV, downloadRegistryJSON } from '@/lib/export';
 import Link from 'next/link';
 
 export default function RegistriesPage() {
-  const registries = mockRegistries;
+  const { registries } = useStore();
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'info' | 'success' | 'warning' | 'danger'> = {
