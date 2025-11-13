@@ -8,9 +8,9 @@ export type UserRole =
   | 'BANK_INTEGRATION';   // Банк (системная интеграция)
 
 // Tax regimes
-export type TaxRegime = 'VAT' | 'USN' | 'NPD';
+export type TaxRegime = 'OSN' | 'USN' | 'NPD';
 
-// VAT rates
+// VAT rates (for OSN tax regime)
 export type VATRate = 0 | 10 | 20 | 22;
 
 // Contractor roles
@@ -48,18 +48,22 @@ export interface RoleEmulation {
   actedAsPartyId?: string;
 }
 
+// Contractor types
+export type ContractorType = 'DEVELOPER' | 'AGENCY' | 'AGENT' | 'IP' | 'NPD';
+
 // Contractor interface
 export interface Contractor {
   id: string;
+  type: ContractorType; // Type of contractor
   name: string;
   inn: string;
   kpp?: string;
-  accountNumber: string;
-  bik: string;
-  bankName: string;
-  address: string;
-  taxRegime: TaxRegime;
-  role: ContractorRole;
+  accountNumber?: string;
+  bik?: string;
+  bankName?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
   offerAcceptedAt?: Date;
   offerAcceptanceChannel?: string;
   createdAt: Date;
@@ -91,10 +95,12 @@ export interface DealInitiator {
 // Deal interface (extended with initiator)
 export interface Deal {
   id: string;
+  dealNumber?: string;
   objectName: string;
   objectAddress: string;
   lotNumber?: string;
-  developerId: string;
+  developerId?: string;
+  projectId?: string;
   totalAmount: number;
   status: DealStatus;
   shares: DealShare[];
@@ -104,11 +110,22 @@ export interface Deal {
   specialAccountReceiptDate?: Date;
   responsibleUserId?: string;
 
+  // Client info (на кого бронируем)
+  clientName?: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  clientComment?: string;
+
+  // Tariff info
+  tariffId?: string;
+  commissionCalculatedAmount?: number;
+  commissionActualAmount?: number;
+
   // Initiator (immutable, read-only)
-  initiator: DealInitiator;
+  initiator?: DealInitiator;
 
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt?: Date;
 }
 
 // Registry payment line interface
@@ -231,3 +248,136 @@ export interface DashboardMetrics {
 
 // Export format type
 export type ExportFormat = 'CSV' | 'JSON' | 'EXCEL';
+
+// ============================================
+// TARIFF CARD & PROJECTS
+// ============================================
+
+// Payment stage for tariff
+export type PaymentStage = 'ADVANCE' | 'DEAL' | 'ACT' | 'COMBINED';
+
+// Commission scheme type
+export type CommissionSchemeType = 'PERCENT_OF_CONTRACT' | 'FIXED_AMOUNT' | 'STEP_SCALE';
+
+// Promo flag for tariff
+export type PromoFlag = 'BASE' | 'SPECIAL' | 'ONLY_M2' | 'ACTION';
+
+// Segment type (тип недвижимости)
+export type Segment = 'APARTMENTS' | 'FLATS' | 'COMMERCIAL' | 'HOUSES' | 'TOWNHOUSES' | 'PARKING';
+
+// Object category (тип объекта)
+export type ObjectCategory = 'STUDIO' | '1_ROOM' | '2_ROOM' | '3_ROOM' | '4_ROOM' | 'OTHER';
+
+// Project (ЖК/Проект застройщика)
+export interface Project {
+  id: string;
+  developerId: string;
+  projectName: string;
+  region: string;
+  city: string;
+  address?: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Tariff (тарифная карта)
+export interface Tariff {
+  id: string;
+  tariffId: string; // Человекочитаемый ID типа TAR-0001
+
+  // Developer & Project
+  developerId: string;
+  developerName: string;
+  developerLegalEntity: string;
+  projectId: string;
+  projectName: string;
+
+  // Location
+  region: string;
+  city: string;
+
+  // Object classification
+  segment: Segment;
+  objectCategory: ObjectCategory;
+
+  // Payment
+  paymentStage: PaymentStage;
+
+  // Commission calculation
+  commissionSchemeType: CommissionSchemeType;
+  commissionTotalPercent?: number;
+  commissionFixedAmount?: number;
+  commissionMinAmount?: number;
+  commissionMaxAmount?: number;
+
+  // Promo
+  promoFlag: PromoFlag;
+  promoDescription?: string;
+
+  // Validity
+  validFrom: Date;
+  validTo?: Date;
+  isActive: boolean;
+
+  // Meta
+  comments?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Input types for creating tariff
+export interface CreateTariffInput {
+  tariffId: string;
+  developerId: string;
+  developerName: string;
+  developerLegalEntity: string;
+  projectId: string;
+  projectName: string;
+  region: string;
+  city: string;
+  segment: Segment;
+  objectCategory: ObjectCategory;
+  paymentStage: PaymentStage;
+  commissionSchemeType: CommissionSchemeType;
+  commissionTotalPercent?: number;
+  commissionFixedAmount?: number;
+  commissionMinAmount?: number;
+  commissionMaxAmount?: number;
+  promoFlag: PromoFlag;
+  promoDescription?: string;
+  validFrom: Date;
+  validTo?: Date;
+  isActive: boolean;
+  comments?: string;
+}
+
+// Event logging types
+export type EventType =
+  | 'DEAL_CREATED'
+  | 'DEAL_UPDATED'
+  | 'DEAL_STATUS_CHANGED'
+  | 'REGISTRY_CREATED'
+  | 'REGISTRY_APPROVED'
+  | 'REGISTRY_SENT_TO_BANK'
+  | 'REGISTRY_EXECUTED'
+  | 'PAYMENT_STATUS_CHANGED'
+  | 'CONTRACTOR_CREATED'
+  | 'CONTRACTOR_UPDATED'
+  | 'CONTRACTOR_OFFER_ACCEPTED'
+  | 'DOCUMENT_UPLOADED'
+  | 'DOCUMENT_VERIFIED';
+
+export interface Event {
+  id: string;
+  type: EventType;
+  entityType: 'DEAL' | 'REGISTRY' | 'PAYMENT' | 'CONTRACTOR' | 'DOCUMENT';
+  entityId: string;
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  description: string;
+  metadata?: Record<string, any>;
+  timestamp: Date;
+}

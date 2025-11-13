@@ -55,24 +55,14 @@ export default function NewRegistryPage() {
     const newLines = [...lines];
     newLines[index] = { ...newLines[index], [field]: value };
 
-    // Auto-set VAT rate when taxRegime is VAT
-    if (field === 'taxRegime' && value === 'VAT') {
+    // Auto-set VAT rate when taxRegime is OSN
+    if (field === 'taxRegime' && value === 'OSN') {
       newLines[index].vatRate = 20;
-    } else if (field === 'taxRegime' && value !== 'VAT') {
+    } else if (field === 'taxRegime' && value !== 'OSN') {
       newLines[index].vatRate = undefined;
     }
 
-    // Auto-fill contractor details
-    if (field === 'contractorId') {
-      const contractor = mockContractors.find(c => c.id === value);
-      if (contractor) {
-        newLines[index].role = contractor.role;
-        newLines[index].taxRegime = contractor.taxRegime;
-        if (contractor.taxRegime === 'VAT') {
-          newLines[index].vatRate = 20;
-        }
-      }
-    }
+    // Contractor details (inn, accountNumber, bik) will be populated from the contractor data on save
 
     setLines(newLines);
   };
@@ -250,14 +240,14 @@ export default function NewRegistryPage() {
                         value={line.taxRegime}
                         onChange={(e) => updateLine(index, 'taxRegime', e.target.value)}
                         options={[
-                          { value: 'VAT', label: 'НДС' },
+                          { value: 'OSN', label: 'НДС' },
                           { value: 'USN', label: 'УСН' },
                           { value: 'NPD', label: 'НПД' },
                         ]}
                       />
                     </TableCell>
                     <TableCell>
-                      {line.taxRegime === 'VAT' ? (
+                      {line.taxRegime === 'OSN' ? (
                         <Select
                           value={line.vatRate?.toString() || '20'}
                           onChange={(e) => updateLine(index, 'vatRate', parseInt(e.target.value))}

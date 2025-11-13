@@ -1,60 +1,65 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
+import { Contractor } from '@/types';
 import { mockContractors } from '../mock-data';
-import type { Contractor } from '@/types';
-import type { Database } from '../database.types';
 
-type CounterpartyRow = Database['public']['Tables']['counterparties']['Row'];
-type CounterpartyInsert = Database['public']['Tables']['counterparties']['Insert'];
-type CounterpartyUpdate = Database['public']['Tables']['counterparties']['Update'];
+export interface CreateCounterpartyInput {
+  type: 'DEVELOPER' | 'AGENCY' | 'AGENT' | 'IP' | 'NPD';
+  name: string;
+  inn: string;
+  kpp?: string;
+  accountNumber?: string;
+  bik?: string;
+  bankName?: string;
+  email?: string;
+  phone?: string;
+}
 
-export class CounterpartiesService {
+class CounterpartiesService {
   /**
-   * Get all counterparties with optional filters
+   * Get all counterparties
    */
   async getCounterparties(filters?: {
     type?: string;
     offerAccepted?: boolean;
   }): Promise<Contractor[]> {
-    // Fallback to mock data if Supabase not configured
-    if (!isSupabaseConfigured() || !supabase) {
-      console.log('📦 Using mock counterparties data');
-      let result = [...mockContractors];
-
-      if (filters?.offerAccepted !== undefined) {
-        result = result.filter(c => !!c.offerAcceptedAt === filters.offerAccepted);
-      }
-
-      return result;
+    if (!isSupabaseConfigured()) {
+      console.warn('📦 Using mock data (Supabase not configured)');
+      return mockContractors;
     }
 
     try {
-      let query = supabase.from('counterparties').select('*');
+      let query = supabase
+        .from('counterparties')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (filters?.type) {
         query = query.eq('type', filters.type);
       }
-
       if (filters?.offerAccepted !== undefined) {
-        query = query.eq('offer_accepted', filters.offerAccepted);
+        if (filters.offerAccepted) {
+          query = query.not('offer_accepted_at', 'is', null);
+        } else {
+          query = query.is('offer_accepted_at', null);
+        }
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query;
 
       if (error) throw error;
 
-      // Map database rows to Contractor type
-      return (data || []).map(this.mapToContractor);
+      return (data || []).map(this.transformFromDB);
     } catch (error) {
       console.error('Error fetching counterparties:', error);
-      return mockContractors;
+      throw error;
     }
   }
 
   /**
-   * Get counterparty by ID
+   * Get single counterparty
    */
   async getCounterparty(id: string): Promise<Contractor | null> {
-    if (!isSupabaseConfigured() || !supabase) {
+    if (!isSupabaseConfigured()) {
       return mockContractors.find(c => c.id === id) || null;
     }
 
@@ -66,32 +71,44 @@ export class CounterpartiesService {
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
-      return data ? this.mapToContractor(data) : null;
+      return this.transformFromDB(data);
     } catch (error) {
       console.error('Error fetching counterparty:', error);
-      return mockContractors.find(c => c.id === id) || null;
+      return null;
     }
   }
 
   /**
    * Create new counterparty
    */
-  async createCounterparty(data: CounterpartyInsert): Promise<Contractor> {
-    if (!isSupabaseConfigured() || !supabase) {
-      throw new Error('Supabase not configured. Cannot create counterparty.');
+  async createCounterparty(input: CreateCounterpartyInput): Promise<Contractor> {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured');
     }
 
     try {
-      const { data: created, error } = await supabase
+      const { data, error } = await supabase
         .from('counterparties')
-        .insert(data as any)
+        .insert({
+          type: input.type,
+          name: input.name,
+          inn: input.inn,
+          kpp: input.kpp,
+          account_number: input.accountNumber,
+          bik: input.bik,
+          bank_name: input.bankName,
+          email: input.email,
+          phone: input.phone,
+        })
         .select()
         .single();
 
       if (error) throw error;
+      if (!data) throw new Error('Failed to create counterparty');
 
-      return this.mapToContractor(created as CounterpartyRow);
+      return this.transformFromDB(data);
     } catch (error) {
       console.error('Error creating counterparty:', error);
       throw error;
@@ -101,22 +118,33 @@ export class CounterpartiesService {
   /**
    * Update counterparty
    */
-  async updateCounterparty(id: string, updates: CounterpartyUpdate): Promise<Contractor> {
-    if (!isSupabaseConfigured() || !supabase) {
-      throw new Error('Supabase not configured. Cannot update counterparty.');
+  async updateCounterparty(id: string, input: Partial<CreateCounterpartyInput>): Promise<Contractor> {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured');
     }
 
     try {
-      const { data: updated, error } = await supabase
+      const { data, error } = await supabase
         .from('counterparties')
-        .update(updates as any)
+        .update({
+          type: input.type,
+          name: input.name,
+          inn: input.inn,
+          kpp: input.kpp,
+          account_number: input.accountNumber,
+          bik: input.bik,
+          bank_name: input.bankName,
+          email: input.email,
+          phone: input.phone,
+        })
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
+      if (!data) throw new Error('Counterparty not found');
 
-      return this.mapToContractor(updated as CounterpartyRow);
+      return this.transformFromDB(data);
     } catch (error) {
       console.error('Error updating counterparty:', error);
       throw error;
@@ -126,47 +154,48 @@ export class CounterpartiesService {
   /**
    * Accept offer for counterparty
    */
-  async acceptOffer(id: string, channel: string = 'UI'): Promise<Contractor> {
-    return this.updateCounterparty(id, {
-      offer_accepted: true,
-      offer_accepted_at: new Date().toISOString(),
-      offer_acceptance_channel: channel,
-    });
+  async acceptOffer(id: string): Promise<Contractor> {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured');
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('counterparties')
+        .update({ offer_accepted_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (!data) throw new Error('Counterparty not found');
+
+      return this.transformFromDB(data);
+    } catch (error) {
+      console.error('Error accepting offer:', error);
+      throw error;
+    }
   }
 
   /**
-   * Map database row to Contractor type
+   * Transform Supabase data to Contractor type
    */
-  private mapToContractor(row: CounterpartyRow): Contractor {
+  private transformFromDB(data: any): Contractor {
     return {
-      id: row.id,
-      name: row.name,
-      inn: row.inn,
-      kpp: row.kpp || undefined,
-      accountNumber: row.account_number,
-      bik: row.bik,
-      bankName: row.bank_name,
-      address: row.address,
-      taxRegime: row.tax_regime as 'VAT' | 'USN' | 'NPD',
-      role: this.mapTypeToRole(row.type),
-      offerAcceptedAt: row.offer_accepted_at ? new Date(row.offer_accepted_at) : undefined,
-      offerAcceptanceChannel: row.offer_acceptance_channel || undefined,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
+      id: data.id,
+      name: data.name,
+      inn: data.inn,
+      type: data.type as 'DEVELOPER' | 'AGENCY' | 'AGENT' | 'IP' | 'NPD',
+      kpp: data.kpp,
+      accountNumber: data.account_number,
+      bik: data.bik,
+      bankName: data.bank_name,
+      email: data.email,
+      phone: data.phone,
+      offerAcceptedAt: data.offer_accepted_at ? new Date(data.offer_accepted_at) : undefined,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
     };
-  }
-
-  /**
-   * Map database type to ContractorRole
-   */
-  private mapTypeToRole(type: string): 'AGENCY' | 'AGENT' | 'IP' | 'NPD' {
-    const map: Record<string, 'AGENCY' | 'AGENT' | 'IP' | 'NPD'> = {
-      agency: 'AGENCY',
-      agent: 'AGENT',
-      ip: 'IP',
-      npd: 'NPD',
-    };
-    return map[type] || 'AGENT';
   }
 }
 

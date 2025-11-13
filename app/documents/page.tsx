@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -9,10 +9,43 @@ import { Upload, FileText, CheckCircle, XCircle } from 'lucide-react';
 
 export default function DocumentsPage() {
   const [activeTab, setActiveTab] = useState('contractors');
+  const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadClick = (contractorId: string) => {
+    setUploadingFor(contractorId);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && uploadingFor) {
+      console.log(`Uploading ${file.name} for contractor ${uploadingFor}`);
+
+      // TODO: Implement actual upload to storage
+      // For now, just show an alert
+      alert(`Документ "${file.name}" загружен для контрагента ${uploadingFor}`);
+
+      // Reset
+      setUploadingFor(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   return (
     <Layout>
       <div className="space-y-6">
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={handleFileChange}
+        />
+
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Документы и первичка</h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -100,7 +133,12 @@ export default function DocumentsPage() {
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t">
-                <Button variant="ghost" size="sm" className="w-full">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => handleUploadClick('contractor-1')}
+                >
                   <Upload className="w-4 h-4 mr-2" />
                   Загрузить документ
                 </Button>
@@ -122,7 +160,12 @@ export default function DocumentsPage() {
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t">
-                <Button variant="ghost" size="sm" className="w-full">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => handleUploadClick('contractor-2')}
+                >
                   <Upload className="w-4 h-4 mr-2" />
                   Загрузить чек
                 </Button>

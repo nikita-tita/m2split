@@ -1,14 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
-import { ArrowLeft, FileStack, Edit, Trash2, Plus } from 'lucide-react';
-import { useStore } from '@/lib/store';
+import { ArrowLeft, FileStack, Edit, Trash2, Plus, Loader2 } from 'lucide-react';
 import { formatCurrency, formatDate, getTaxRegimeLabel } from '@/lib/validations';
+import { dealsService } from '@/lib/services/deals.service';
+import { Deal } from '@/types';
 import Link from 'next/link';
 
 interface DealDetailClientProps {
@@ -16,8 +17,35 @@ interface DealDetailClientProps {
 }
 
 export default function DealDetailClient({ id }: DealDetailClientProps) {
-  const { deals } = useStore();
-  const deal = deals.find((d) => d.id === id);
+  const [deal, setDeal] = useState<Deal | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadDeal = async () => {
+      try {
+        setLoading(true);
+        const data = await dealsService.getDeal(id);
+        setDeal(data);
+      } catch (error) {
+        console.error('Failed to load deal:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDeal();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="text-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" />
+          <p className="text-gray-500 mt-4">Загрузка сделки...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!deal) {
     return (
@@ -70,7 +98,7 @@ export default function DealDetailClient({ id }: DealDetailClientProps) {
             <dl className="grid grid-cols-2 gap-4">
               <div>
                 <dt className="text-sm font-medium text-gray-500">№ сделки</dt>
-                <dd className="mt-1 text-sm font-mono text-gray-900">{deal.id}</dd>
+                <dd className="mt-1 text-sm font-mono text-gray-900">{deal.dealNumber || deal.id}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">Лот</dt>

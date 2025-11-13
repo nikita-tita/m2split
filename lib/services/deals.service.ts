@@ -1,55 +1,47 @@
 import { supabase, isSupabaseConfigured } from '../supabase';
-import { mockDeals } from '../mock-data';
-import type { Deal, DealShare } from '@/types';
-import type { Database } from '../database.types';
+import { Deal, DealShare, Contractor } from '@/types';
+import { mockDeals, mockContractors } from '../mock-data';
 
-type DealRow = Database['public']['Tables']['deals']['Row'];
-type DealInsert = Database['public']['Tables']['deals']['Insert'];
-type DealUpdate = Database['public']['Tables']['deals']['Update'];
-type ParticipantInsert = Database['public']['Tables']['deal_participants']['Insert'];
-
-interface CreateDealInput {
+export interface CreateDealInput {
   objectName: string;
   objectAddress: string;
   lotNumber?: string;
+  developerId?: string;
+  agencyId?: string;
   totalAmount: number;
-  developerId: string;
+  commissionAmount: number;
+  contractNumber?: string;
+  contractDate?: Date;
   shares: Array<{
-    counterpartyId: string;
+    contractorId: string;
     role: 'AGENCY' | 'AGENT' | 'IP' | 'NPD';
     sharePercent: number;
     amount: number;
-    taxRegime: 'VAT' | 'USN' | 'NPD';
+    taxRegime: 'OSN' | 'USN' | 'NPD';
     vatRate?: number;
     contractNumber?: string;
     contractDate?: Date;
   }>;
-  contractBasis?: string;
-  contractNumber?: string;
-  contractDate?: Date;
-  initiatorRole: string;
-  initiatorPartyId: string;
-  initiatorUserId: string;
 }
 
-export class DealsService {
+export interface UpdateDealInput extends Partial<CreateDealInput> {
+  id: string;
+  status?: 'draft' | 'ready_for_registry' | 'in_registry' | 'closed';
+}
+
+class DealsService {
   /**
-   * Get all deals with optional filters
+   * Get all deals (with optional filters by role/contractor)
    */
   async getDeals(filters?: {
     status?: string;
     developerId?: string;
+    agencyId?: string;
+    contractorId?: string;
   }): Promise<Deal[]> {
-    // Fallback to mock data if Supabase not configured
-    if (!isSupabaseConfigured() || !supabase) {
-      console.log('📦 Using mock deals data');
-      let result = [...mockDeals];
-
-      if (filters?.status) {
-        result = result.filter(d => d.status === filters.status);
-      }
-
-      return result;
+    if (!isSupabaseConfigured()) {
+      console.warn('📦 Using mock data (Supabase not configured)');
+      return mockDeals;
     }
 
     try {
@@ -57,37 +49,49 @@ export class DealsService {
         .from('deals')
         .select(`
           *,
-          deal_participants (
-            *,
-            counterparties (*)
+          developer:developer_id(id, name, inn),
+          agency:agency_id(id, name, inn),
+          deal_participants(
+            id,
+            role,
+            share_percent,
+            amount,
+            tax_regime,
+            vat_rate,
+            contract_number,
+            contract_date,
+            counterparty:counterparty_id(id, name, inn, type, account_number, bik, bank_name)
           )
-        `);
+        `)
+        .order('created_at', { ascending: false });
 
       if (filters?.status) {
         query = query.eq('status', filters.status);
       }
-
       if (filters?.developerId) {
         query = query.eq('developer_id', filters.developerId);
       }
+      if (filters?.agencyId) {
+        query = query.eq('agency_id', filters.agencyId);
+      }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query;
 
       if (error) throw error;
 
-      // Map database rows to Deal type
-      return (data || []).map(this.mapToDeal);
+      // Transform Supabase data to Deal format
+      return (data || []).map(this.transformDealFromDB);
     } catch (error) {
       console.error('Error fetching deals:', error);
-      return mockDeals;
+      throw error;
     }
   }
 
   /**
-   * Get deal by ID with participants
+   * Get single deal by ID
    */
   async getDeal(id: string): Promise<Deal | null> {
-    if (!isSupabaseConfigured() || !supabase) {
+    if (!isSupabaseConfigured()) {
       return mockDeals.find(d => d.id === id) || null;
     }
 
@@ -96,67 +100,78 @@ export class DealsService {
         .from('deals')
         .select(`
           *,
-          deal_participants (
-            *,
-            counterparties (*)
+          developer:developer_id(id, name, inn),
+          agency:agency_id(id, name, inn),
+          deal_participants(
+            id,
+            role,
+            share_percent,
+            amount,
+            tax_regime,
+            vat_rate,
+            contract_number,
+            contract_date,
+            counterparty:counterparty_id(id, name, inn, type, account_number, bik, bank_name)
           )
         `)
         .eq('id', id)
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
-      return data ? this.mapToDeal(data) : null;
+      return this.transformDealFromDB(data);
     } catch (error) {
       console.error('Error fetching deal:', error);
-      return mockDeals.find(d => d.id === id) || null;
+      return null;
     }
   }
 
   /**
-   * Create new deal with participants
+   * Create new deal
    */
   async createDeal(input: CreateDealInput): Promise<Deal> {
-    if (!isSupabaseConfigured() || !supabase) {
-      throw new Error('Supabase not configured. Cannot create deal.');
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured. Please set up Supabase to create deals.');
     }
 
     // Validate shares sum to 100%
-    const totalShares = input.shares.reduce((sum, s) => sum + s.sharePercent, 0);
-    if (Math.abs(totalShares - 100) > 0.01) {
-      throw new Error(`Shares must sum to 100% (got ${totalShares}%)`);
+    const totalPercent = input.shares.reduce((sum, s) => sum + s.sharePercent, 0);
+    if (Math.abs(totalPercent - 100) > 0.01) {
+      throw new Error(`Shares must sum to 100% (current: ${totalPercent}%)`);
     }
 
     try {
-      // Create deal
-      const dealData: DealInsert = {
-        object_name: input.objectName,
-        object_address: input.objectAddress,
-        lot_number: input.lotNumber,
-        total_amount: input.totalAmount,
-        developer_id: input.developerId,
-        contract_basis: input.contractBasis,
-        contract_number: input.contractNumber,
-        contract_date: input.contractDate?.toISOString().split('T')[0],
-        initiator_role: input.initiatorRole,
-        initiator_party_id: input.initiatorPartyId,
-        initiator_user_id: input.initiatorUserId,
-        status: 'draft',
-      };
+      // Generate deal number
+      const dealNumber = `D-${Date.now()}`;
 
-      const { data: createdDeal, error: dealError } = await supabase
+      // Create deal
+      const { data: deal, error: dealError } = await supabase
         .from('deals')
-        .insert(dealData as any)
+        .insert({
+          deal_number: dealNumber,
+          object_name: input.objectName,
+          object_address: input.objectAddress,
+          lot_number: input.lotNumber,
+          developer_id: input.developerId,
+          agency_id: input.agencyId,
+          total_amount: input.totalAmount,
+          commission_amount: input.commissionAmount,
+          contract_number: input.contractNumber,
+          contract_date: input.contractDate?.toISOString().split('T')[0],
+          status: 'draft',
+        })
         .select()
         .single();
 
       if (dealError) throw dealError;
+      if (!deal) throw new Error('Failed to create deal');
 
       // Create participants
-      const participants: ParticipantInsert[] = input.shares.map(share => ({
-        deal_id: createdDeal.id,
-        counterparty_id: share.counterpartyId,
-        role: share.role.toLowerCase() as 'agency' | 'agent' | 'ip' | 'npd',
+      const participants = input.shares.map(share => ({
+        deal_id: deal.id,
+        counterparty_id: share.contractorId,
+        role: share.role,
         share_percent: share.sharePercent,
         amount: share.amount,
         tax_regime: share.taxRegime,
@@ -167,15 +182,15 @@ export class DealsService {
 
       const { error: participantsError } = await supabase
         .from('deal_participants')
-        .insert(participants as any);
+        .insert(participants);
 
       if (participantsError) throw participantsError;
 
       // Fetch complete deal with participants
-      const deal = await this.getDeal(createdDeal.id);
-      if (!deal) throw new Error('Failed to fetch created deal');
+      const createdDeal = await this.getDeal(deal.id);
+      if (!createdDeal) throw new Error('Failed to fetch created deal');
 
-      return deal;
+      return createdDeal;
     } catch (error) {
       console.error('Error creating deal:', error);
       throw error;
@@ -185,23 +200,35 @@ export class DealsService {
   /**
    * Update deal
    */
-  async updateDeal(id: string, updates: Partial<DealUpdate>): Promise<Deal> {
-    if (!isSupabaseConfigured() || !supabase) {
-      throw new Error('Supabase not configured. Cannot update deal.');
+  async updateDeal(input: UpdateDealInput): Promise<Deal> {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured');
     }
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('deals')
-        .update(updates as any)
-        .eq('id', id);
+        .update({
+          object_name: input.objectName,
+          object_address: input.objectAddress,
+          lot_number: input.lotNumber,
+          total_amount: input.totalAmount,
+          commission_amount: input.commissionAmount,
+          contract_number: input.contractNumber,
+          contract_date: input.contractDate?.toISOString().split('T')[0],
+          status: input.status,
+        })
+        .eq('id', input.id)
+        .select()
+        .single();
 
       if (error) throw error;
+      if (!data) throw new Error('Deal not found');
 
-      const deal = await this.getDeal(id);
-      if (!deal) throw new Error('Deal not found after update');
+      const updatedDeal = await this.getDeal(input.id);
+      if (!updatedDeal) throw new Error('Failed to fetch updated deal');
 
-      return deal;
+      return updatedDeal;
     } catch (error) {
       console.error('Error updating deal:', error);
       throw error;
@@ -209,64 +236,44 @@ export class DealsService {
   }
 
   /**
-   * Map database row to Deal type
+   * Transform Supabase data to Deal type
    */
-  private mapToDeal(row: any): Deal {
+  private transformDealFromDB(data: any): Deal {
     return {
-      id: row.id,
-      objectName: row.object_name,
-      objectAddress: row.object_address,
-      lotNumber: row.lot_number || undefined,
-      developerId: row.developer_id,
-      totalAmount: row.total_amount,
-      status: row.status,
-      shares: (row.deal_participants || []).map((p: any) => this.mapToShare(p)),
-      contractBasis: row.contract_basis || undefined,
-      contractNumber: row.contract_number || undefined,
-      contractDate: row.contract_date ? new Date(row.contract_date) : undefined,
-      specialAccountReceiptDate: row.special_account_receipt_date
-        ? new Date(row.special_account_receipt_date)
+      id: data.id,
+      dealNumber: data.deal_number || data.id,
+      objectName: data.object_name,
+      objectAddress: data.object_address,
+      lotNumber: data.lot_number,
+      totalAmount: parseFloat(data.total_amount || '0'),
+      status: data.status as 'DRAFT' | 'IN_PROGRESS' | 'IN_REGISTRY' | 'PAID',
+      contractNumber: data.contract_number,
+      contractDate: data.contract_date ? new Date(data.contract_date) : undefined,
+      specialAccountReceiptDate: data.special_account_receipt_date
+        ? new Date(data.special_account_receipt_date)
         : undefined,
-      responsibleUserId: row.responsible_user_id || undefined,
-      initiator: {
-        role: row.initiator_role,
-        partyId: row.initiator_party_id,
-        userId: row.initiator_user_id,
-        timestamp: new Date(row.initiator_timestamp),
-      },
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-    };
-  }
-
-  /**
-   * Map participant to DealShare
-   */
-  private mapToShare(participant: any): DealShare {
-    return {
-      id: participant.id,
-      contractorId: participant.counterparty_id,
-      contractor: participant.counterparties ? {
-        id: participant.counterparties.id,
-        name: participant.counterparties.name,
-        inn: participant.counterparties.inn,
-        kpp: participant.counterparties.kpp,
-        accountNumber: participant.counterparties.account_number,
-        bik: participant.counterparties.bik,
-        bankName: participant.counterparties.bank_name,
-        address: participant.counterparties.address,
-        taxRegime: participant.counterparties.tax_regime,
-        role: participant.role.toUpperCase(),
-        createdAt: new Date(participant.counterparties.created_at),
-        updatedAt: new Date(participant.counterparties.updated_at),
-      } : undefined,
-      role: participant.role.toUpperCase() as 'AGENCY' | 'AGENT' | 'IP' | 'NPD',
-      sharePercent: participant.share_percent,
-      amount: participant.amount,
-      taxRegime: participant.tax_regime as 'VAT' | 'USN' | 'NPD',
-      vatRate: participant.vat_rate || undefined,
-      contractNumber: participant.contract_number || undefined,
-      contractDate: participant.contract_date ? new Date(participant.contract_date) : undefined,
+      createdAt: new Date(data.created_at),
+      shares: (data.deal_participants || []).map((p: any) => ({
+        id: p.id,
+        role: p.role,
+        sharePercent: parseFloat(p.share_percent || '0'),
+        amount: parseFloat(p.amount || '0'),
+        taxRegime: p.tax_regime,
+        vatRate: p.vat_rate ? parseFloat(p.vat_rate) : undefined,
+        contractNumber: p.contract_number,
+        contractDate: p.contract_date ? new Date(p.contract_date) : undefined,
+        contractor: p.counterparty ? {
+          id: p.counterparty.id,
+          name: p.counterparty.name,
+          inn: p.counterparty.inn,
+          type: p.counterparty.type,
+          accountNumber: p.counterparty.account_number,
+          bik: p.counterparty.bik,
+          bankName: p.counterparty.bank_name,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as Contractor : undefined,
+      })) as DealShare[],
     };
   }
 }

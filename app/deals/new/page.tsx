@@ -1,17 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Info } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { mockContractors, mockUsers } from '@/lib/mock-data';
-import { Deal, DealShare, DealStatus, ContractorRole, TaxRegime, VATRate } from '@/types';
+import { Deal, DealShare, DealStatus, ContractorRole, TaxRegime, VATRate, Contractor, Project, Tariff } from '@/types';
 import { formatCurrency } from '@/lib/validations';
+import { counterpartiesService } from '@/lib/services/counterparties.service';
+import { projectsService } from '@/lib/services/projects.service';
+import { tariffsService } from '@/lib/services/tariffs.service';
+import { eventsService } from '@/lib/services/events.service';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -19,6 +23,7 @@ interface ShareForm {
   contractorId: string;
   role: ContractorRole;
   sharePercent: number;
+  amount: number; // Auto-calculated from sharePercent and commission
   taxRegime: TaxRegime;
   vatRate?: VATRate;
   contractNumber: string;
@@ -29,19 +34,136 @@ export default function NewDealPage() {
   const router = useRouter();
   const { addDeal } = useStore();
 
+  // Developer & Project
+  const [developers, setDevelopers] = useState<Contractor[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedDeveloperId, setSelectedDeveloperId] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
+
   const [objectName, setObjectName] = useState('');
   const [objectAddress, setObjectAddress] = useState('');
   const [lotNumber, setLotNumber] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
   const [contractNumber, setContractNumber] = useState('');
   const [contractDate, setContractDate] = useState('');
+
+  // Client fields (на кого бронируем)
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+
+  // Tariff and commission
+  const [selectedTariff, setSelectedTariff] = useState<Tariff | null>(null);
+  const [calculatedCommission, setCalculatedCommission] = useState<number>(0);
+
   const [shares, setShares] = useState<ShareForm[]>([]);
+
+  // Load developers and projects on mount
+  useEffect(() => {
+    loadDevelopersAndProjects();
+  }, []);
+
+  // Filter projects when developer changes
+  useEffect(() => {
+    if (selectedDeveloperId) {
+      const filtered = projects.filter(p => p.developerId === selectedDeveloperId);
+      setFilteredProjects(filtered);
+    } else {
+      setFilteredProjects([]);
+    }
+    // Reset project selection when developer changes
+    setSelectedProjectId('');
+    setObjectName('');
+    setObjectAddress('');
+  }, [selectedDeveloperId, projects]);
+
+  // Auto-fill object info from selected project
+  useEffect(() => {
+    if (selectedProjectId) {
+      const project = projects.find(p => p.id === selectedProjectId);
+      if (project) {
+        setObjectName(project.projectName);
+        setObjectAddress(project.address || `${project.city}, ${project.region}`);
+      }
+    }
+  }, [selectedProjectId, projects]);
+
+  // Auto-find tariff and calculate commission when project is selected
+  useEffect(() => {
+    const findTariff = async () => {
+      if (selectedProjectId && selectedDeveloperId) {
+        try {
+          const tariff = await tariffsService.findBestTariff({
+            developerId: selectedDeveloperId,
+            projectId: selectedProjectId,
+          });
+
+          setSelectedTariff(tariff);
+
+          // Calculate commission if totalAmount is set
+          if (tariff && totalAmount) {
+            const commission = tariffsService.calculateCommission(
+              parseFloat(totalAmount),
+              tariff
+            );
+            setCalculatedCommission(commission);
+          } else {
+            setCalculatedCommission(0);
+          }
+        } catch (error) {
+          console.error('Failed to find tariff:', error);
+          setSelectedTariff(null);
+          setCalculatedCommission(0);
+        }
+      } else {
+        setSelectedTariff(null);
+        setCalculatedCommission(0);
+      }
+    };
+
+    findTariff();
+  }, [selectedProjectId, selectedDeveloperId, totalAmount]);
+
+  // Recalculate all share amounts when commission changes
+  useEffect(() => {
+    if (calculatedCommission > 0 && shares.length > 0) {
+      setShares(prevShares =>
+        prevShares.map(share => ({
+          ...share,
+          amount: (calculatedCommission * share.sharePercent) / 100,
+        }))
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calculatedCommission]);
+
+  const loadDevelopersAndProjects = async () => {
+    try {
+      // Load developers
+      const devData = await counterpartiesService.getCounterparties({
+        type: 'DEVELOPER',
+        offerAccepted: true,
+      });
+      setDevelopers(devData);
+
+      // Load projects (Moscow only)
+      const projData = await projectsService.getProjects({
+        city: 'Москва',
+        isActive: true,
+      });
+      setProjects(projData);
+    } catch (error) {
+      console.error('Failed to load developers/projects:', error);
+    }
+  };
 
   const addShare = () => {
     setShares([...shares, {
       contractorId: '',
       role: 'AGENT',
       sharePercent: 0,
+      amount: 0,
       taxRegime: 'USN',
       contractNumber: '',
       contractDate: '',
@@ -56,17 +178,16 @@ export default function NewDealPage() {
     const newShares = [...shares];
     newShares[index] = { ...newShares[index], [field]: value };
 
-    // Auto-set VAT rate when taxRegime is VAT
-    if (field === 'taxRegime' && value === 'VAT') {
+    // Auto-set VAT rate when taxRegime is OSN
+    if (field === 'taxRegime' && value === 'OSN') {
       newShares[index].vatRate = 20;
-    } else if (field === 'taxRegime' && value !== 'VAT') {
+    } else if (field === 'taxRegime' && value !== 'OSN') {
       newShares[index].vatRate = undefined;
     }
 
-    // Auto-calculate amount based on share percent
-    if (field === 'sharePercent' && totalAmount) {
-      const amount = (parseFloat(totalAmount) * value) / 100;
-      // Store amount in state if needed
+    // Auto-calculate amount based on share percent and commission
+    if (field === 'sharePercent' && calculatedCommission > 0) {
+      newShares[index].amount = (calculatedCommission * value) / 100;
     }
 
     setShares(newShares);
@@ -92,7 +213,7 @@ export default function NewDealPage() {
         contractor,
         role: share.role,
         sharePercent: share.sharePercent,
-        amount: (amount * share.sharePercent) / 100,
+        amount: share.amount, // Use pre-calculated amount from commission
         taxRegime: share.taxRegime,
         vatRate: share.vatRate,
         contractNumber: share.contractNumber || undefined,
@@ -105,12 +226,19 @@ export default function NewDealPage() {
       objectName,
       objectAddress,
       lotNumber: lotNumber || undefined,
-      developerId: '1',
+      developerId: selectedDeveloperId || undefined,
+      projectId: selectedProjectId || undefined,
       totalAmount: amount,
       status: 'DRAFT' as DealStatus,
       shares: dealShares,
       contractNumber: contractNumber || undefined,
       contractDate: contractDate ? new Date(contractDate) : undefined,
+      clientName: clientName || undefined,
+      clientPhone: clientPhone || undefined,
+      clientEmail: clientEmail || undefined,
+      tariffId: selectedTariff?.id,
+      commissionCalculatedAmount: calculatedCommission || undefined,
+      commissionActualAmount: calculatedCommission || undefined,
       responsibleUserId: '2',
       initiator: {
         role: 'M2_OPERATOR',
@@ -141,6 +269,10 @@ export default function NewDealPage() {
               <p className="mt-1 text-sm text-gray-500">
                 Укажите объект и распределите доли между участниками
               </p>
+              <div className="mt-2 flex items-center gap-2 text-sm text-blue-600">
+                <Info className="w-4 h-4" />
+                <span>Система работает только для объектов в Москве</span>
+              </div>
             </div>
           </div>
           <div className="flex gap-3">
@@ -157,12 +289,42 @@ export default function NewDealPage() {
         <Card>
           <CardHeader title="Основная информация" />
           <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                label="Застройщик"
+                value={selectedDeveloperId}
+                onChange={(e) => setSelectedDeveloperId(e.target.value)}
+                options={[
+                  { value: '', label: 'Выберите застройщика' },
+                  ...developers.map(d => ({
+                    value: d.id,
+                    label: d.name
+                  }))
+                ]}
+                required
+              />
+              <Select
+                label="Проект / ЖК"
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                options={[
+                  { value: '', label: selectedDeveloperId ? 'Выберите проект' : 'Сначала выберите застройщика' },
+                  ...filteredProjects.map(p => ({
+                    value: p.id,
+                    label: p.projectName
+                  }))
+                ]}
+                required
+                disabled={!selectedDeveloperId}
+              />
+            </div>
             <Input
               label="Название объекта"
               placeholder="ЖК Солнечный"
               value={objectName}
               onChange={(e) => setObjectName(e.target.value)}
               required
+              disabled={!selectedProjectId}
             />
             <Input
               label="Адрес объекта"
@@ -170,6 +332,7 @@ export default function NewDealPage() {
               value={objectAddress}
               onChange={(e) => setObjectAddress(e.target.value)}
               required
+              disabled={!selectedProjectId}
             />
             <div className="grid grid-cols-2 gap-4">
               <Input
@@ -179,7 +342,7 @@ export default function NewDealPage() {
                 onChange={(e) => setLotNumber(e.target.value)}
               />
               <Input
-                label="Сумма комиссии (₽)"
+                label="Сумма договора с застройщиком (₽)"
                 type="number"
                 placeholder="15000000"
                 value={totalAmount}
@@ -199,6 +362,68 @@ export default function NewDealPage() {
                 type="date"
                 value={contractDate}
                 onChange={(e) => setContractDate(e.target.value)}
+              />
+            </div>
+
+            {/* Tariff and Commission Calculation */}
+            {selectedTariff && totalAmount && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="text-sm font-semibold text-blue-900 mb-2">
+                  Расчет комиссии КВН
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Тариф:</span>
+                    <span className="font-medium text-gray-900">
+                      {tariffsService.getTariffDisplayInfo(selectedTariff)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Сумма договора:</span>
+                    <span className="font-medium text-gray-900">
+                      {formatCurrency(parseFloat(totalAmount))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-blue-200">
+                    <span className="font-semibold text-blue-900">Комиссия КВН:</span>
+                    <span className="font-bold text-blue-900">
+                      {formatCurrency(calculatedCommission)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-700 mt-2">
+                    * Расчет на основе уникального клиента (максимальный тариф)
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Client Info */}
+        <Card>
+          <CardHeader title="Информация о клиенте" />
+          <p className="text-sm text-gray-500 mb-4">На кого бронируем объект</p>
+          <div className="space-y-4">
+            <Input
+              label="ФИО клиента"
+              placeholder="Иванов Иван Иванович"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Телефон"
+                type="tel"
+                placeholder="+7 (999) 123-45-67"
+                value={clientPhone}
+                onChange={(e) => setClientPhone(e.target.value)}
+              />
+              <Input
+                label="Email"
+                type="email"
+                placeholder="client@example.com"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
               />
             </div>
           </div>
@@ -279,8 +504,8 @@ export default function NewDealPage() {
                       />
                     </TableCell>
                     <TableCell className="font-medium">
-                      {totalAmount && share.sharePercent
-                        ? formatCurrency((parseFloat(totalAmount) * share.sharePercent) / 100)
+                      {calculatedCommission > 0 && share.amount > 0
+                        ? formatCurrency(share.amount)
                         : '—'}
                     </TableCell>
                     <TableCell>
@@ -288,14 +513,14 @@ export default function NewDealPage() {
                         value={share.taxRegime}
                         onChange={(e) => updateShare(index, 'taxRegime', e.target.value)}
                         options={[
-                          { value: 'VAT', label: 'НДС' },
+                          { value: 'OSN', label: 'НДС' },
                           { value: 'USN', label: 'УСН' },
                           { value: 'NPD', label: 'НПД' },
                         ]}
                       />
                     </TableCell>
                     <TableCell>
-                      {share.taxRegime === 'VAT' ? (
+                      {share.taxRegime === 'OSN' ? (
                         <Select
                           value={share.vatRate?.toString() || '20'}
                           onChange={(e) => updateShare(index, 'vatRate', parseInt(e.target.value))}

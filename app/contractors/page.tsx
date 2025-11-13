@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -8,51 +8,69 @@ import { Input, Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
-import { Plus, CheckCircle, Edit, Trash2 } from 'lucide-react';
-import { useStore } from '@/lib/store';
-import { Contractor, ContractorRole, TaxRegime } from '@/types';
-import { getTaxRegimeLabel, formatDateTime } from '@/lib/validations';
+import { Plus, CheckCircle, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Contractor, ContractorType } from '@/types';
+import { formatDateTime } from '@/lib/validations';
+import { counterpartiesService } from '@/lib/services/counterparties.service';
 
 interface ContractorForm {
+  type: ContractorType;
   name: string;
   inn: string;
   kpp: string;
   accountNumber: string;
   bik: string;
   bankName: string;
-  address: string;
-  taxRegime: TaxRegime;
-  role: ContractorRole;
+  email: string;
+  phone: string;
 }
 
 export default function ContractorsPage() {
-  const { contractors, addContractor, updateContractor } = useStore();
+  const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ContractorForm>({
+    type: 'AGENT',
     name: '',
     inn: '',
     kpp: '',
     accountNumber: '',
     bik: '',
     bankName: '',
-    address: '',
-    taxRegime: 'USN',
-    role: 'AGENT',
+    email: '',
+    phone: '',
   });
+
+  useEffect(() => {
+    loadContractors();
+  }, []);
+
+  const loadContractors = async () => {
+    try {
+      setLoading(true);
+      const data = await counterpartiesService.getCounterparties();
+      setContractors(data);
+    } catch (error) {
+      console.error('Failed to load contractors:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openCreateModal = () => {
     setEditingId(null);
     setForm({
+      type: 'AGENT',
       name: '',
       inn: '',
       kpp: '',
       accountNumber: '',
       bik: '',
       bankName: '',
-      address: '',
-      taxRegime: 'USN',
-      role: 'AGENT',
+      email: '',
+      phone: '',
     });
     setIsModalOpen(true);
   };
@@ -60,56 +78,83 @@ export default function ContractorsPage() {
   const openEditModal = (contractor: Contractor) => {
     setEditingId(contractor.id);
     setForm({
+      type: contractor.type,
       name: contractor.name,
       inn: contractor.inn,
       kpp: contractor.kpp || '',
-      accountNumber: contractor.accountNumber,
-      bik: contractor.bik,
-      bankName: contractor.bankName,
-      address: contractor.address,
-      taxRegime: contractor.taxRegime,
-      role: contractor.role,
+      accountNumber: contractor.accountNumber || '',
+      bik: contractor.bik || '',
+      bankName: contractor.bankName || '',
+      email: contractor.email || '',
+      phone: contractor.phone || '',
     });
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (editingId) {
-      // Update existing contractor
-      updateContractor(editingId, {
-        ...form,
+    setSaving(true);
+    try {
+      const input = {
+        type: form.type,
+        name: form.name,
+        inn: form.inn,
         kpp: form.kpp || undefined,
-        updatedAt: new Date(),
-      });
-    } else {
-      // Create new contractor
-      const newContractor: Contractor = {
-        id: `c${Date.now()}`,
-        ...form,
-        kpp: form.kpp || undefined,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        accountNumber: form.accountNumber || undefined,
+        bik: form.bik || undefined,
+        bankName: form.bankName || undefined,
+        email: form.email || undefined,
+        phone: form.phone || undefined,
       };
-      addContractor(newContractor);
-    }
 
-    setIsModalOpen(false);
+      if (editingId) {
+        await counterpartiesService.updateCounterparty(editingId, input);
+      } else {
+        await counterpartiesService.createCounterparty(input);
+      }
+
+      await loadContractors();
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Failed to save contractor:', error);
+      alert('Не удалось сохранить контрагента');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const updateForm = (field: keyof ContractorForm, value: any) => {
-    setForm({ ...form, [field]: value });
+  const handleAcceptOffer = async (id: string) => {
+    try {
+      await counterpartiesService.acceptOffer(id);
+      await loadContractors();
+    } catch (error) {
+      console.error('Failed to accept offer:', error);
+      alert('Не удалось принять оферту');
+    }
+  };
+
+  const getTypeBadge = (type: ContractorType) => {
+    const labels: Record<ContractorType, string> = {
+      DEVELOPER: 'Застройщик',
+      AGENCY: 'АН',
+      AGENT: 'Агент',
+      IP: 'ИП',
+      NPD: 'НПД',
+    };
+
+    return <Badge variant="info" size="sm">{labels[type]}</Badge>;
   };
 
   return (
     <Layout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Контрагенты и оферты</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Контрагенты</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Управление исполнителями и акцептом оферт
+              Управление контрагентами и статусами оферт
             </p>
           </div>
           <Button onClick={openCreateModal}>
@@ -118,184 +163,219 @@ export default function ContractorsPage() {
           </Button>
         </div>
 
+        {/* Contractors Table */}
         <Card padding="none">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableCell header>Наименование</TableCell>
-                <TableCell header>ИНН</TableCell>
-                <TableCell header>Роль</TableCell>
-                <TableCell header>Режим</TableCell>
-                <TableCell header>Счёт</TableCell>
-                <TableCell header>Банк</TableCell>
-                <TableCell header>Оферта</TableCell>
-                <TableCell header> </TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {contractors.map((contractor) => (
-                <TableRow key={contractor.id}>
-                  <TableCell>
-                    <div className="font-medium">{contractor.name}</div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-mono text-sm">{contractor.inn}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge size="sm" variant="info">
-                      {contractor.role === 'AGENCY' && 'АН'}
-                      {contractor.role === 'AGENT' && 'Агент'}
-                      {contractor.role === 'IP' && 'ИП'}
-                      {contractor.role === 'NPD' && 'НПД'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge size="sm">{getTaxRegimeLabel(contractor.taxRegime)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-mono text-xs">{contractor.accountNumber}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div>{contractor.bankName}</div>
-                      <div className="text-xs text-gray-500 font-mono">БИК: {contractor.bik}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {contractor.offerAcceptedAt ? (
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                        <div className="text-xs">
-                          <div className="text-green-600 font-medium">Принято</div>
-                          <div className="text-gray-500">
-                            {formatDateTime(contractor.offerAcceptedAt)}
-                          </div>
+          {loading ? (
+            <div className="text-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" />
+              <p className="text-gray-500 mt-4">Загрузка контрагентов...</p>
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableCell header>Тип</TableCell>
+                    <TableCell header>Название</TableCell>
+                    <TableCell header>ИНН / КПП</TableCell>
+                    <TableCell header>Реквизиты</TableCell>
+                    <TableCell header>Оферта</TableCell>
+                    <TableCell header>Дата создания</TableCell>
+                    <TableCell header> </TableCell>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contractors.map((contractor) => (
+                    <TableRow key={contractor.id}>
+                      <TableCell>
+                        {getTypeBadge(contractor.type)}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{contractor.name}</div>
+                          {contractor.email && (
+                            <div className="text-xs text-gray-500">{contractor.email}</div>
+                          )}
                         </div>
-                      </div>
-                    ) : (
-                      <Badge variant="warning">Не принято</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditModal(contractor)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-mono text-xs">
+                          <div>ИНН: {contractor.inn}</div>
+                          {contractor.kpp && <div>КПП: {contractor.kpp}</div>}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-xs">
+                          {contractor.accountNumber && (
+                            <div>Р/С: {contractor.accountNumber}</div>
+                          )}
+                          {contractor.bik && (
+                            <div>БИК: {contractor.bik}</div>
+                          )}
+                          {contractor.bankName && (
+                            <div className="text-gray-500">{contractor.bankName}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {contractor.offerAcceptedAt ? (
+                          <div className="flex items-center gap-1 text-sm text-green-600">
+                            <CheckCircle className="w-4 h-4" />
+                            Принята
+                          </div>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAcceptOffer(contractor.id)}
+                          >
+                            Принять оферту
+                          </Button>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-gray-500">
+                        {formatDateTime(contractor.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditModal(contractor)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {contractors.length === 0 && !loading && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Пока нет контрагентов. Добавьте первого!</p>
+                </div>
+              )}
+            </>
+          )}
         </Card>
-      </div>
 
-      {/* Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingId ? 'Редактирование контрагента' : 'Добавление контрагента'}
-      >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Наименование"
-            placeholder="ООО Недвижимость Плюс"
-            value={form.name}
-            onChange={(e) => updateForm('name', e.target.value)}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="ИНН"
-              placeholder="7701234567"
-              value={form.inn}
-              onChange={(e) => updateForm('inn', e.target.value)}
-              required
-            />
-            <Input
-              label="КПП (опционально)"
-              placeholder="770101001"
-              value={form.kpp}
-              onChange={(e) => updateForm('kpp', e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        {/* Create/Edit Modal */}
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title={editingId ? 'Редактировать контрагента' : 'Новый контрагент'}
+        >
+          <form onSubmit={handleSubmit} className="space-y-4">
             <Select
-              label="Роль"
-              value={form.role}
-              onChange={(e) => updateForm('role', e.target.value)}
+              label="Тип контрагента"
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value as ContractorType })}
               options={[
+                { value: 'DEVELOPER', label: 'Застройщик' },
                 { value: 'AGENCY', label: 'Агентство недвижимости' },
-                { value: 'AGENT', label: 'Агент' },
+                { value: 'AGENT', label: 'Агент (физлицо)' },
                 { value: 'IP', label: 'Индивидуальный предприниматель' },
                 { value: 'NPD', label: 'Самозанятый (НПД)' },
               ]}
-            />
-            <Select
-              label="Налоговый режим"
-              value={form.taxRegime}
-              onChange={(e) => updateForm('taxRegime', e.target.value)}
-              options={[
-                { value: 'VAT', label: 'НДС' },
-                { value: 'USN', label: 'УСН' },
-                { value: 'NPD', label: 'НПД' },
-              ]}
-            />
-          </div>
-
-          <Input
-            label="Расчётный счёт"
-            placeholder="40702810100000001234"
-            value={form.accountNumber}
-            onChange={(e) => updateForm('accountNumber', e.target.value)}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="БИК банка"
-              placeholder="044525225"
-              value={form.bik}
-              onChange={(e) => updateForm('bik', e.target.value)}
               required
+              disabled={saving}
             />
+
             <Input
-              label="Наименование банка"
-              placeholder="ПАО Сбербанк"
-              value={form.bankName}
-              onChange={(e) => updateForm('bankName', e.target.value)}
+              label="Название / ФИО"
+              placeholder="ООО Компания или Иванов Иван Иванович"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
+              disabled={saving}
             />
-          </div>
 
-          <Input
-            label="Адрес"
-            placeholder="г. Москва, ул. Примерная, д. 1"
-            value={form.address}
-            onChange={(e) => updateForm('address', e.target.value)}
-            required
-          />
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="ИНН"
+                placeholder="1234567890"
+                value={form.inn}
+                onChange={(e) => setForm({ ...form, inn: e.target.value })}
+                required
+                disabled={saving}
+              />
+              <Input
+                label="КПП"
+                placeholder="123456789"
+                value={form.kpp}
+                onChange={(e) => setForm({ ...form, kpp: e.target.value })}
+                disabled={saving}
+              />
+            </div>
 
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setIsModalOpen(false)}
-            >
-              Отмена
-            </Button>
-            <Button type="submit">
-              {editingId ? 'Сохранить' : 'Добавить'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+            <Input
+              label="Расчётный счёт"
+              placeholder="40702810..."
+              value={form.accountNumber}
+              onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
+              disabled={saving}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="БИК банка"
+                placeholder="044525225"
+                value={form.bik}
+                onChange={(e) => setForm({ ...form, bik: e.target.value })}
+                disabled={saving}
+              />
+              <Input
+                label="Название банка"
+                placeholder="ПАО Сбербанк"
+                value={form.bankName}
+                onChange={(e) => setForm({ ...form, bankName: e.target.value })}
+                disabled={saving}
+              />
+            </div>
+
+            <Input
+              label="Email"
+              type="email"
+              placeholder="email@example.com"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              disabled={saving}
+            />
+
+            <Input
+              label="Телефон"
+              type="tel"
+              placeholder="+7 (999) 123-45-67"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              disabled={saving}
+            />
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setIsModalOpen(false)}
+                disabled={saving}
+              >
+                Отмена
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Сохранение...
+                  </>
+                ) : (
+                  editingId ? 'Сохранить' : 'Создать'
+                )}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      </div>
     </Layout>
   );
 }

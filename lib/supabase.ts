@@ -1,29 +1,39 @@
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from './database.types';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// These will be set via environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    '⚠️ Supabase credentials not found. Using mock data fallback.\n' +
-    'To enable database: create .env.local with NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY'
-  );
-}
-
-// Create Supabase client without strict typing for easier development
-export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false, // For MVP, no auth yet
-      },
-    })
-  : null;
-
-// Helper to check if Supabase is configured
-export const isSupabaseConfigured = (): boolean => {
-  return supabase !== null;
+// Helper function to check if Supabase is configured
+export const isSupabaseConfigured = () => {
+  return Boolean(supabaseUrl && supabaseAnonKey);
 };
 
-// Type exports for convenience
-export type { Database };
+// Lazy initialization of Supabase client
+let supabaseInstance: SupabaseClient | null = null;
+
+// Create Supabase client without strict typing for now
+// Types can be generated later using: npx supabase gen types typescript --project-id <project-id>
+export const getSupabaseClient = () => {
+  if (!isSupabaseConfigured()) {
+    console.warn('⚠️ Supabase credentials not configured. Using mock data.');
+    return null;
+  }
+
+  if (!supabaseInstance) {
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+  }
+
+  return supabaseInstance;
+};
+
+// Export a proxy object that lazily gets the client
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const client = getSupabaseClient();
+    if (!client) {
+      throw new Error('Supabase not configured');
+    }
+    return (client as any)[prop];
+  }
+});
