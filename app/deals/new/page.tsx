@@ -18,6 +18,7 @@ import { tariffsService } from '@/lib/services/tariffs.service';
 import { eventsService } from '@/lib/services/events.service';
 import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
 import { businessProcessContent } from '@/lib/business-process-content';
+import { OnboardingTip } from '@/components/ui/OnboardingTip';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -37,9 +38,10 @@ export default function NewDealPage() {
   const { addDeal, currentRole } = useStore();
 
   // Check permissions
-  const canCreateDeal = ['M2_OPERATOR', 'AGENCY_ADMIN'].includes(currentRole);
+  const canCreateDeal = ['M2_OPERATOR', 'AGENCY_ADMIN', 'CONTRACTOR'].includes(currentRole);
   const isM2Operator = currentRole === 'M2_OPERATOR';
   const isAgencyAdmin = currentRole === 'AGENCY_ADMIN';
+  const isContractor = currentRole === 'CONTRACTOR';
 
   // Developer & Project (only for M2 Operator)
   const [developers, setDevelopers] = useState<Contractor[]>([]);
@@ -326,6 +328,15 @@ export default function NewDealPage() {
             </Button>
           </div>
         </div>
+
+        {/* Onboarding for Contractor */}
+        {isContractor && (
+          <OnboardingTip
+            id="contractor-deal-form"
+            title="✏️ Заполните данные сделки"
+            description="Укажите объект недвижимости, сумму договора с клиентом и данные клиента. Система автоматически рассчитает комиссию КВН на основе тарифа М2 с застройщиком. Затем вы сможете распределить доли между участниками (агентство, агенты, ИП)."
+          />
+        )}
 
         {/* Business Process Description */}
         <BusinessProcessInfo {...businessProcessContent.dealCreation} />

@@ -22,6 +22,7 @@ import { mockDashboardMetrics, mockDeals, mockPayments } from '@/lib/mock-data';
 import { formatCurrency, formatDate } from '@/lib/validations';
 import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
 import { businessProcessContent } from '@/lib/business-process-content';
+import { OnboardingTip } from '@/components/ui/OnboardingTip';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -33,7 +34,7 @@ export default function DashboardPage() {
   const recentPayments = mockPayments.slice(0, 5);
 
   // Role-based content
-  const canCreateDeal = ['M2_OPERATOR', 'AGENCY_ADMIN'].includes(currentRole);
+  const canCreateDeal = ['M2_OPERATOR', 'AGENCY_ADMIN', 'CONTRACTOR'].includes(currentRole);
   const canCreateRegistry = ['M2_OPERATOR', 'DEVELOPER_ADMIN'].includes(currentRole);
   const showFullMetrics = ['DEVELOPER_ADMIN', 'M2_OPERATOR'].includes(currentRole);
   const showContractorView = currentRole === 'CONTRACTOR';
@@ -97,6 +98,17 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Onboarding for Contractor - First step in the system */}
+        {showContractorView && (
+          <OnboardingTip
+            id="contractor-first-deal"
+            title="👋 Добро пожаловать в М2 Split!"
+            description="Вы находитесь в роли агента. Первый шаг - создать сделку на бронирование объекта у застройщика. Система автоматически рассчитает комиссию КВН и покажет, как М2 распределит её между участниками."
+            actionText="Создать первую сделку"
+            actionHref="/deals/new"
+          />
+        )}
 
         {/* Business Process Overview */}
         <BusinessProcessInfo {...businessProcessContent.overview} defaultExpanded={false} />
