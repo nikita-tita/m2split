@@ -1,14 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
-import { ArrowLeft, Send, Download, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Send, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { formatCurrency, formatDate, getTaxRegimeLabel } from '@/lib/validations';
+import { registriesService } from '@/lib/services/registries.service';
+import { eventsService } from '@/lib/services/events.service';
 import Link from 'next/link';
 
 interface RegistryDetailClientProps {
@@ -16,8 +18,9 @@ interface RegistryDetailClientProps {
 }
 
 export default function RegistryDetailClient({ id }: RegistryDetailClientProps) {
-  const { registries } = useStore();
+  const { registries, currentRole, updateRegistry } = useStore();
   const registry = registries.find((r) => r.id === id);
+  const [updating, setUpdating] = useState(false);
 
   if (!registry) {
     return (
@@ -31,6 +34,130 @@ export default function RegistryDetailClient({ id }: RegistryDetailClientProps) 
       </Layout>
     );
   }
+
+  const handleApprove = async () => {
+    setUpdating(true);
+    try {
+      // Update registry status
+      try {
+        await registriesService.updateRegistryStatus(registry.id, 'APPROVED');
+      } catch (error) {
+        console.warn('Supabase not configured, updating store directly');
+      }
+
+      // Update store
+      updateRegistry(registry.id, {
+        status: 'APPROVED',
+        approvedAt: new Date(),
+      });
+
+      // Log event
+      await eventsService.logEvent({
+        type: 'REGISTRY_APPROVED',
+        entityType: 'REGISTRY',
+        entityId: registry.id,
+        userId: '1', // TODO: Get from auth
+        userName: 'Developer Admin',
+        userRole: currentRole,
+        description: `Реестр ${registry.registryNumber} утверждён застройщиком`,
+        metadata: {
+          registryNumber: registry.registryNumber,
+          totalAmount: registry.totalAmount,
+          linesCount: registry.linesCount,
+        },
+      });
+
+      alert('Реестр утверждён');
+    } catch (error) {
+      console.error('Failed to approve registry:', error);
+      alert('Не удалось утвердить реестр');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleReject = async () => {
+    const reason = prompt('Укажите причину отклонения:');
+    if (!reason) return;
+
+    setUpdating(true);
+    try {
+      // Update registry status
+      try {
+        await registriesService.updateRegistryStatus(registry.id, 'DRAFT');
+      } catch (error) {
+        console.warn('Supabase not configured, updating store directly');
+      }
+
+      // Update store
+      updateRegistry(registry.id, {
+        status: 'DRAFT',
+      });
+
+      // Log event
+      await eventsService.logEvent({
+        type: 'REGISTRY_APPROVED',
+        entityType: 'REGISTRY',
+        entityId: registry.id,
+        userId: '1', // TODO: Get from auth
+        userName: 'Developer Admin',
+        userRole: currentRole,
+        description: `Реестр ${registry.registryNumber} отклонён: ${reason}`,
+        metadata: {
+          registryNumber: registry.registryNumber,
+          rejectionReason: reason,
+        },
+      });
+
+      alert('Реестр отклонён');
+    } catch (error) {
+      console.error('Failed to reject registry:', error);
+      alert('Не удалось отклонить реестр');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleSendToBank = async () => {
+    setUpdating(true);
+    try {
+      // Update registry status
+      try {
+        await registriesService.updateRegistryStatus(registry.id, 'SENT_TO_BANK');
+      } catch (error) {
+        console.warn('Supabase not configured, updating store directly');
+      }
+
+      // Update store
+      updateRegistry(registry.id, {
+        status: 'SENT_TO_BANK',
+        sentToBankAt: new Date(),
+      });
+
+      // Log event
+      await eventsService.logEvent({
+        type: 'REGISTRY_SENT_TO_BANK',
+        entityType: 'REGISTRY',
+        entityId: registry.id,
+        userId: '2', // TODO: Get from auth
+        userName: 'M2 Operator',
+        userRole: currentRole,
+        description: `Реестр ${registry.registryNumber} отправлен в банк`,
+        metadata: {
+          registryNumber: registry.registryNumber,
+          totalAmount: registry.totalAmount,
+          linesCount: registry.linesCount,
+        },
+      });
+
+      alert('Реестр отправлен в банк');
+    } catch (error) {
+      console.error('Failed to send registry to bank:', error);
+      alert('Не удалось отправить реестр в банк');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'info' | 'success' | 'warning' | 'danger'> = {
@@ -94,12 +221,48 @@ export default function RegistryDetailClient({ id }: RegistryDetailClientProps) 
             </div>
           </div>
           <div className="flex gap-3">
-            {registry.status === 'APPROVED' && (
-              <Button>
-                <Send className="w-5 h-5 mr-2" />
+            {/* Developer Admin: Approve/Reject when PENDING_APPROVAL */}
+            {currentRole === 'DEVELOPER_ADMIN' && registry.status === 'PENDING_APPROVAL' && (
+              <>
+                <Button
+                  variant="primary"
+                  onClick={handleApprove}
+                  disabled={updating}
+                >
+                  {updating ? (
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                  )}
+                  Утвердить реестр
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleReject}
+                  disabled={updating}
+                >
+                  <XCircle className="w-5 h-5 mr-2" />
+                  Отклонить
+                </Button>
+              </>
+            )}
+
+            {/* M2 Operator: Send to bank when APPROVED */}
+            {currentRole === 'M2_OPERATOR' && registry.status === 'APPROVED' && (
+              <Button
+                variant="primary"
+                onClick={handleSendToBank}
+                disabled={updating}
+              >
+                {updating ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5 mr-2" />
+                )}
                 Отправить в банк
               </Button>
             )}
+
             <Button variant="secondary">
               <Download className="w-5 h-5 mr-2" />
               Скачать
