@@ -24,7 +24,21 @@ class CounterpartiesService {
   }): Promise<Contractor[]> {
     if (!isSupabaseConfigured()) {
       console.warn('📦 Using mock data (Supabase not configured)');
-      return mockContractors;
+
+      // Filter mock data by type if specified
+      let filtered = mockContractors;
+
+      if (filters?.type) {
+        filtered = filtered.filter(c => c.type === filters.type);
+      }
+
+      if (filters?.offerAccepted !== undefined) {
+        filtered = filtered.filter(c =>
+          filters.offerAccepted ? c.offerAcceptedAt !== undefined : c.offerAcceptedAt === undefined
+        );
+      }
+
+      return filtered;
     }
 
     try {
