@@ -12,6 +12,8 @@ import { Plus, CheckCircle, Edit, Trash2, Loader2 } from 'lucide-react';
 import { Contractor, ContractorType } from '@/types';
 import { formatDateTime } from '@/lib/validations';
 import { counterpartiesService } from '@/lib/services/counterparties.service';
+import { eventsService } from '@/lib/services/events.service';
+import { useStore } from '@/lib/store';
 
 interface ContractorForm {
   type: ContractorType;
@@ -26,6 +28,7 @@ interface ContractorForm {
 }
 
 export default function ContractorsPage() {
+  const { currentRole } = useStore();
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -108,10 +111,45 @@ export default function ContractorsPage() {
         phone: form.phone || undefined,
       };
 
+      let contractorId: string;
       if (editingId) {
         await counterpartiesService.updateCounterparty(editingId, input);
+        contractorId = editingId;
+
+        // Log contractor update event
+        await eventsService.logEvent({
+          type: 'CONTRACTOR_UPDATED',
+          entityType: 'CONTRACTOR',
+          entityId: contractorId,
+          userId: '2', // TODO: Get from auth
+          userName: 'Current User',
+          userRole: currentRole,
+          description: `Контрагент обновлён: ${form.name}`,
+          metadata: {
+            name: form.name,
+            inn: form.inn,
+            type: form.type,
+          },
+        });
       } else {
-        await counterpartiesService.createCounterparty(input);
+        const created = await counterpartiesService.createCounterparty(input);
+        contractorId = created.id;
+
+        // Log contractor creation event
+        await eventsService.logEvent({
+          type: 'CONTRACTOR_CREATED',
+          entityType: 'CONTRACTOR',
+          entityId: contractorId,
+          userId: '2', // TODO: Get from auth
+          userName: 'Current User',
+          userRole: currentRole,
+          description: `Контрагент создан: ${form.name}`,
+          metadata: {
+            name: form.name,
+            inn: form.inn,
+            type: form.type,
+          },
+        });
       }
 
       await loadContractors();
@@ -126,7 +164,27 @@ export default function ContractorsPage() {
 
   const handleAcceptOffer = async (id: string) => {
     try {
+      const contractor = contractors.find(c => c.id === id);
       await counterpartiesService.acceptOffer(id);
+
+      // Log offer acceptance event
+      if (contractor) {
+        await eventsService.logEvent({
+          type: 'CONTRACTOR_OFFER_ACCEPTED',
+          entityType: 'CONTRACTOR',
+          entityId: id,
+          userId: '2', // TODO: Get from auth
+          userName: 'Current User',
+          userRole: currentRole,
+          description: `Оферта принята: ${contractor.name}`,
+          metadata: {
+            name: contractor.name,
+            inn: contractor.inn,
+            type: contractor.type,
+          },
+        });
+      }
+
       await loadContractors();
     } catch (error) {
       console.error('Failed to accept offer:', error);

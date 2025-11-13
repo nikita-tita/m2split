@@ -6,10 +6,12 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
-import { ArrowLeft, FileStack, Edit, Trash2, Plus, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileStack, Edit, CheckCircle, XCircle, Loader2, Trash2, Plus } from 'lucide-react';
 import { formatCurrency, formatDate, getTaxRegimeLabel } from '@/lib/validations';
 import { dealsService } from '@/lib/services/deals.service';
-import { Deal } from '@/types';
+import { eventsService } from '@/lib/services/events.service';
+import { useStore } from '@/lib/store';
+import { Deal, DealStatus } from '@/types';
 import Link from 'next/link';
 
 interface DealDetailClientProps {
@@ -19,6 +21,8 @@ interface DealDetailClientProps {
 export default function DealDetailClient({ id }: DealDetailClientProps) {
   const [deal, setDeal] = useState<Deal | null>(null);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const { currentRole, updateDeal: updateDealInStore } = useStore();
 
   useEffect(() => {
     const loadDeal = async () => {
@@ -35,6 +39,107 @@ export default function DealDetailClient({ id }: DealDetailClientProps) {
 
     loadDeal();
   }, [id]);
+
+  const handleStatusChange = async (newStatus: DealStatus) => {
+    if (!deal) return;
+
+    setUpdating(true);
+    try {
+      // Update deal status (works with both Supabase and mock data)
+      try {
+        await dealsService.updateDeal({
+          id: deal.id,
+          status: newStatus,
+        });
+      } catch (error) {
+        // Fallback to store update if Supabase not configured
+        console.warn('Supabase not configured, updating store directly');
+      }
+
+      // Update store
+      updateDealInStore(deal.id, { status: newStatus });
+
+      // Log event
+      await eventsService.logEvent({
+        type: 'DEAL_STATUS_CHANGED',
+        entityType: 'DEAL',
+        entityId: deal.id,
+        userId: '2', // TODO: Get from auth
+        userName: 'Current User',
+        userRole: currentRole,
+        description: `Статус сделки изменён: ${deal.status} → ${newStatus}`,
+        metadata: {
+          oldStatus: deal.status,
+          newStatus,
+          dealNumber: deal.dealNumber,
+        },
+      });
+
+      // Update local state
+      const updatedDeal = { ...deal, status: newStatus, updatedAt: new Date() };
+      setDeal(updatedDeal);
+
+      alert(`Статус сделки изменён на ${getStatusLabel(newStatus)}`);
+    } catch (error) {
+      console.error('Failed to update deal status:', error);
+      alert('Не удалось изменить статус сделки');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const getStatusLabel = (status: DealStatus): string => {
+    const labels: Record<DealStatus, string> = {
+      DRAFT: 'Черновик',
+      IN_PROGRESS: 'В работе',
+      IN_REGISTRY: 'В реестре',
+      APPROVED: 'Утверждён',
+      SENT_TO_BANK: 'Отправлен в банк',
+      PAID: 'Выплачено',
+      PARTIALLY_PAID: 'Частично выплачено',
+      CANCELLED: 'Отменён',
+    };
+    return labels[status] || status;
+  };
+
+  const getAvailableStatusTransitions = (): { status: DealStatus; label: string; icon: 'check' }[] => {
+    if (!deal) return [];
+
+    const transitions: { status: DealStatus; label: string; icon: 'check' }[] = [];
+
+    // Workflow: DRAFT → IN_PROGRESS → IN_REGISTRY → PAID
+    switch (deal.status) {
+      case 'DRAFT':
+        if (currentRole === 'M2_OPERATOR' || currentRole === 'DEVELOPER_ADMIN') {
+          transitions.push({
+            status: 'IN_PROGRESS',
+            label: 'Подтвердить бронь',
+            icon: 'check',
+          });
+        }
+        break;
+      case 'IN_PROGRESS':
+        if (currentRole === 'M2_OPERATOR') {
+          transitions.push({
+            status: 'IN_REGISTRY',
+            label: 'Добавить в реестр',
+            icon: 'check',
+          });
+        }
+        break;
+      case 'IN_REGISTRY':
+        if (currentRole === 'M2_OPERATOR' || currentRole === 'DEVELOPER_ADMIN') {
+          transitions.push({
+            status: 'PAID',
+            label: 'Отметить как выплачено',
+            icon: 'check',
+          });
+        }
+        break;
+    }
+
+    return transitions;
+  };
 
   if (loading) {
     return (
@@ -80,13 +185,33 @@ export default function DealDetailClient({ id }: DealDetailClientProps) {
             </div>
           </div>
           <div className="flex gap-3">
+            {/* Status transition buttons */}
+            {getAvailableStatusTransitions().map((transition) => (
+              <Button
+                key={transition.status}
+                variant="primary"
+                onClick={() => handleStatusChange(transition.status)}
+                disabled={updating}
+              >
+                {updating ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                )}
+                {transition.label}
+              </Button>
+            ))}
+
+            {deal.status === 'IN_PROGRESS' && currentRole === 'M2_OPERATOR' && (
+              <Button variant="secondary">
+                <FileStack className="w-5 h-5 mr-2" />
+                Сформировать реестр
+              </Button>
+            )}
+
             <Button variant="secondary">
               <Edit className="w-5 h-5 mr-2" />
               Редактировать
-            </Button>
-            <Button>
-              <FileStack className="w-5 h-5 mr-2" />
-              Сформировать реестр
             </Button>
           </div>
         </div>

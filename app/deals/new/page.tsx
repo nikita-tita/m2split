@@ -268,6 +268,27 @@ export default function NewDealPage() {
     };
 
     addDeal(newDeal);
+
+    // Log deal creation event
+    eventsService.logEvent({
+      type: 'DEAL_CREATED',
+      entityType: 'DEAL',
+      entityId: dealId,
+      userId: '2', // TODO: Get from auth
+      userName: 'Current User',
+      userRole: currentRole,
+      description: `Сделка создана: ${objectName}`,
+      metadata: {
+        objectName,
+        objectAddress,
+        totalAmount: amount,
+        commissionAmount: calculatedCommission,
+        participantsCount: shares.length,
+        developerId: selectedDeveloperId,
+        projectId: selectedProjectId,
+      },
+    });
+
     router.push(`/deals/${dealId}`);
   };
 
