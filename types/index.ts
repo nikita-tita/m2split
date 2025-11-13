@@ -278,8 +278,23 @@ export interface Project {
   address?: string;
   description?: string;
   isActive: boolean;
+  apartments?: Apartment[]; // Available apartments in this project
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Apartment/Unit in a project
+export interface Apartment {
+  id: string;
+  projectId: string;
+  lotNumber: string; // Номер лота/квартиры
+  roomType: 'STUDIO' | '1_ROOM' | '2_ROOM' | '3_ROOM' | '4_ROOM'; // Тип квартиры
+  area: number; // Площадь в м²
+  floor: number; // Этаж
+  section?: string; // Секция/корпус
+  price: number; // Цена квартиры
+  status: 'AVAILABLE' | 'RESERVED' | 'SOLD'; // Статус
+  address: string; // Полный адрес квартиры
 }
 
 // Tariff (тарифная карта)
