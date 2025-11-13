@@ -59,7 +59,7 @@ interface AppState {
 export const useStore = create<AppState>((set) => ({
   // Current user and role
   currentUser: null,
-  currentRole: 'M2_OPERATOR', // Default role
+  currentRole: 'CONTRACTOR', // Default role - агент (первый шаг в системе)
   setCurrentUser: (user) => set({ currentUser: user }),
   switchRole: (role) => set({ currentRole: role }),
 
