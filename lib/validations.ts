@@ -23,10 +23,10 @@ export const validateBIK = (bik: string): boolean => {
 
 // VAT rate validation for tax regime
 export const validateVATRate = (taxRegime: TaxRegime, vatRate?: VATRate): boolean => {
-  if (taxRegime === 'VAT' && vatRate === undefined) {
+  if (taxRegime === 'OSN' && vatRate === undefined) {
     return false;
   }
-  if (taxRegime !== 'VAT' && vatRate !== undefined) {
+  if (taxRegime !== 'OSN' && vatRate !== undefined) {
     return false;
   }
   return true;
@@ -81,7 +81,7 @@ export const formatDateTime = (date: Date | string): string => {
 // Tax regime display names
 export const getTaxRegimeLabel = (regime: TaxRegime): string => {
   const labels: Record<TaxRegime, string> = {
-    VAT: 'НДС',
+    OSN: 'НДС',
     USN: 'УСН',
     NPD: 'НПД',
   };

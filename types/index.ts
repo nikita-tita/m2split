@@ -8,9 +8,9 @@ export type UserRole =
   | 'BANK_INTEGRATION';   // Банк (системная интеграция)
 
 // Tax regimes
-export type TaxRegime = 'VAT' | 'USN' | 'NPD';
+export type TaxRegime = 'OSN' | 'USN' | 'NPD';
 
-// VAT rates
+// VAT rates (for OSN tax regime)
 export type VATRate = 0 | 10 | 20 | 22;
 
 // Contractor roles
@@ -48,18 +48,22 @@ export interface RoleEmulation {
   actedAsPartyId?: string;
 }
 
+// Contractor types
+export type ContractorType = 'DEVELOPER' | 'AGENCY' | 'AGENT' | 'IP' | 'NPD';
+
 // Contractor interface
 export interface Contractor {
   id: string;
+  type: ContractorType; // Type of contractor
   name: string;
   inn: string;
   kpp?: string;
-  accountNumber: string;
-  bik: string;
-  bankName: string;
-  address: string;
-  taxRegime: TaxRegime;
-  role: ContractorRole;
+  accountNumber?: string;
+  bik?: string;
+  bankName?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
   offerAcceptedAt?: Date;
   offerAcceptanceChannel?: string;
   createdAt: Date;
@@ -91,10 +95,11 @@ export interface DealInitiator {
 // Deal interface (extended with initiator)
 export interface Deal {
   id: string;
+  dealNumber?: string;
   objectName: string;
   objectAddress: string;
   lotNumber?: string;
-  developerId: string;
+  developerId?: string;
   totalAmount: number;
   status: DealStatus;
   shares: DealShare[];
@@ -105,10 +110,10 @@ export interface Deal {
   responsibleUserId?: string;
 
   // Initiator (immutable, read-only)
-  initiator: DealInitiator;
+  initiator?: DealInitiator;
 
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt?: Date;
 }
 
 // Registry payment line interface
