@@ -1,19 +1,21 @@
 'use client';
 
 import React from 'react';
-import { use } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
-import { ArrowLeft, FileStack, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileStack, Edit, Trash2, Plus } from 'lucide-react';
 import { mockDeals } from '@/lib/mock-data';
 import { formatCurrency, formatDate, getTaxRegimeLabel } from '@/lib/validations';
 import Link from 'next/link';
 
-export default function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+// Dynamic route with client-side rendering
+export const dynamic = 'force-dynamic';
+
+export default function DealDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const deal = mockDeals.find((d) => d.id === id);
 
   if (!deal) {
