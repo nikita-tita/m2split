@@ -14,11 +14,14 @@ import { downloadDealsCSV } from '@/lib/export';
 import { dealsService } from '@/lib/services/deals.service';
 import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
 import { businessProcessContent } from '@/lib/business-process-content';
+import { OnboardingTip } from '@/components/ui/OnboardingTip';
+import { useStore } from '@/lib/store';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function DealsPage() {
   const router = useRouter();
+  const { currentRole } = useStore();
 
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +99,31 @@ export default function DealsPage() {
             </Link>
           </div>
         </div>
+
+        {/* Onboarding Tips by Role */}
+        {currentRole === 'CONTRACTOR' && (
+          <OnboardingTip
+            id="contractor-deals-list"
+            title="📋 Ваши сделки по заявкам застройщиков"
+            description="Здесь отображаются все сделки, которые вы создали, работая с базой контактов от застройщиков. Следите за статусами: Черновик → В работе → В реестре → Выплачено. Когда застройщик оплатит заявку, М2 автоматически распределит комиссию между всеми исполнителями."
+          />
+        )}
+
+        {currentRole === 'AGENCY_ADMIN' && (
+          <OnboardingTip
+            id="agency-deals-list"
+            title="📊 Сделки вашего агентства"
+            description="Отслеживайте все сделки вашего агентства по заявкам застройщиков. Видите распределение долей между вашими агентами. М2 автоматически разделит комиссию между исполнителями после оплаты заявки застройщиком."
+          />
+        )}
+
+        {currentRole === 'M2_OPERATOR' && (
+          <OnboardingTip
+            id="m2-deals-list"
+            title="🎯 Управление заявками застройщиков"
+            description="Контролируйте все заявки застройщиков и их выполнение. Здесь видно, какие исполнители (агенты/АН) работают над каждой заявкой. Когда исполнителей несколько, система автоматически сплитит комиссию по их долям."
+          />
+        )}
 
         {/* Business Process Description */}
         <BusinessProcessInfo {...businessProcessContent.dealsList} />

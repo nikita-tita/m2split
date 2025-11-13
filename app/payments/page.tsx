@@ -9,9 +9,12 @@ import { mockPayments, mockContractors } from '@/lib/mock-data';
 import { formatCurrency, formatDateTime } from '@/lib/validations';
 import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
 import { businessProcessContent } from '@/lib/business-process-content';
+import { OnboardingTip } from '@/components/ui/OnboardingTip';
+import { useStore } from '@/lib/store';
 
 export default function PaymentsPage() {
   const payments = mockPayments;
+  const { currentRole } = useStore();
 
   return (
     <Layout>
@@ -22,6 +25,39 @@ export default function PaymentsPage() {
             Мониторинг статусов выплат от банка
           </p>
         </div>
+
+        {/* Onboarding Tips by Role */}
+        {currentRole === 'M2_OPERATOR' && (
+          <OnboardingTip
+            id="m2-payments-list"
+            title="🏦 Мониторинг выплат от банка"
+            description="Здесь отображаются статусы всех выплат по реестрам. Банк присылает референсы и статусы исполнения. Отслеживайте, какие выплаты прошли успешно, какие в ожидании, и какие завершились с ошибкой."
+          />
+        )}
+
+        {currentRole === 'DEVELOPER_ADMIN' && (
+          <OnboardingTip
+            id="dev-payments-list"
+            title="💳 Статусы выплат исполнителям"
+            description="Здесь видны статусы всех выплат по вашим заявкам. После того как вы оплатили заявку, М2 формирует реестр и отправляет в банк. Здесь вы видите, когда банк исполнил выплаты исполнителям."
+          />
+        )}
+
+        {currentRole === 'CONTRACTOR' && (
+          <OnboardingTip
+            id="contractor-payments-list"
+            title="💰 Мои выплаты"
+            description="Здесь отображаются статусы ваших выплат. Когда застройщик оплачивает заявку, М2 формирует реестр и отправляет в банк. Отслеживайте, когда банк исполнит вашу выплату и деньги поступят на ваш счёт."
+          />
+        )}
+
+        {currentRole === 'AGENCY_ADMIN' && (
+          <OnboardingTip
+            id="agency-payments-list"
+            title="📊 Выплаты агентству"
+            description="Здесь отображаются статусы выплат вашему агентству и вашим агентам. После оплаты заявки застройщиком, М2 распределяет комиссию и отправляет реестр в банк. Следите за статусами исполнения."
+          />
+        )}
 
         {/* Business Process Description */}
         <BusinessProcessInfo {...businessProcessContent.payments} />

@@ -8,8 +8,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Upload, FileText, CheckCircle, XCircle } from 'lucide-react';
 import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
 import { businessProcessContent } from '@/lib/business-process-content';
+import { OnboardingTip } from '@/components/ui/OnboardingTip';
+import { useStore } from '@/lib/store';
 
 export default function DocumentsPage() {
+  const { currentRole } = useStore();
   const [activeTab, setActiveTab] = useState('contractors');
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +57,39 @@ export default function DocumentsPage() {
             Управление первичной документацией по выплатам
           </p>
         </div>
+
+        {/* Onboarding Tips by Role */}
+        {currentRole === 'M2_OPERATOR' && (
+          <OnboardingTip
+            id="m2-documents-list"
+            title="📄 Управление первичкой"
+            description="Здесь собирается вся первичная документация от исполнителей после выплат. Для агентств нужны акты и счета-фактуры, для ИП - акты, для НПД - чеки. Следите за полнотой первички, чтобы сформировать пакет для застройщика."
+          />
+        )}
+
+        {currentRole === 'DEVELOPER_ADMIN' && (
+          <OnboardingTip
+            id="dev-documents-list"
+            title="📦 Пакеты документов от М2"
+            description="Здесь М2 формирует для вас сводные пакеты документов по каждому реестру выплат. В пакете: реестр, банковские статусы, первичка от всех исполнителей. Скачивайте готовые архивы для бухгалтерии."
+          />
+        )}
+
+        {currentRole === 'CONTRACTOR' && (
+          <OnboardingTip
+            id="contractor-documents-list"
+            title="📋 Ваши документы для М2"
+            description="После получения выплаты вам нужно загрузить первичные документы. Для ИП/УСН - акт выполненных работ, для ОСН - акт + счёт-фактура, для НПД - чек. Без документов выплата считается незакрытой."
+          />
+        )}
+
+        {currentRole === 'AGENCY_ADMIN' && (
+          <OnboardingTip
+            id="agency-documents-list"
+            title="📑 Документы агентства"
+            description="Здесь загружайте первичные документы по выплатам вашему агентству. Для ОСН нужны акт и счёт-фактура, для УСН - только акт. Следите за полнотой документов ваших агентов."
+          />
+        )}
 
         {/* Business Process Description */}
         <BusinessProcessInfo {...businessProcessContent.documents} />

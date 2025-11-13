@@ -15,6 +15,7 @@ import { formatCurrency } from '@/lib/validations';
 import { eventsService } from '@/lib/services/events.service';
 import { BusinessProcessInfo } from '@/components/ui/BusinessProcessInfo';
 import { businessProcessContent } from '@/lib/business-process-content';
+import { OnboardingTip } from '@/components/ui/OnboardingTip';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -31,7 +32,7 @@ interface LineForm {
 
 export default function NewRegistryPage() {
   const router = useRouter();
-  const { addRegistry } = useStore();
+  const { addRegistry, currentRole } = useStore();
 
   const [registryDate, setRegistryDate] = useState(
     new Date().toISOString().split('T')[0]
@@ -165,6 +166,23 @@ export default function NewRegistryPage() {
             </Button>
           </div>
         </div>
+
+        {/* Onboarding Tips by Role */}
+        {currentRole === 'M2_OPERATOR' && (
+          <OnboardingTip
+            id="m2-registry-create"
+            title="📋 Формирование реестра выплат"
+            description="Здесь вы формируете реестр выплат исполнителям после того, как застройщик оплатил заявку. Добавьте всех исполнителей, укажите суммы сплита, и отправьте реестр в банк. М2 выплатит каждому исполнителю его долю со спецсчёта."
+          />
+        )}
+
+        {currentRole === 'DEVELOPER_ADMIN' && (
+          <OnboardingTip
+            id="dev-registry-create"
+            title="📊 М2 формирует реестры автоматически"
+            description="Этот экран используется М2 для создания реестров выплат исполнителям ваших заявок. После оплаты заявки М2 автоматически распределяет комиссию между всеми участниками сделки и отправляет реестр в банк."
+          />
+        )}
 
         {/* Business Process Description */}
         <BusinessProcessInfo {...businessProcessContent.registryCreation} />
