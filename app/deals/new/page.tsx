@@ -32,9 +32,14 @@ interface ShareForm {
 
 export default function NewDealPage() {
   const router = useRouter();
-  const { addDeal } = useStore();
+  const { addDeal, currentRole } = useStore();
 
-  // Developer & Project
+  // Check permissions
+  const canCreateDeal = ['M2_OPERATOR', 'AGENCY_ADMIN'].includes(currentRole);
+  const isM2Operator = currentRole === 'M2_OPERATOR';
+  const isAgencyAdmin = currentRole === 'AGENCY_ADMIN';
+
+  // Developer & Project (only for M2 Operator)
   const [developers, setDevelopers] = useState<Contractor[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedDeveloperId, setSelectedDeveloperId] = useState('');
@@ -59,10 +64,19 @@ export default function NewDealPage() {
 
   const [shares, setShares] = useState<ShareForm[]>([]);
 
-  // Load developers and projects on mount
+  // Check access on mount
   useEffect(() => {
-    loadDevelopersAndProjects();
-  }, []);
+    if (!canCreateDeal) {
+      router.push('/deals');
+    }
+  }, [canCreateDeal, router]);
+
+  // Load developers and projects on mount (only for M2 Operator)
+  useEffect(() => {
+    if (isM2Operator) {
+      loadDevelopersAndProjects();
+    }
+  }, [isM2Operator]);
 
   // Filter projects when developer changes
   useEffect(() => {
@@ -195,7 +209,10 @@ export default function NewDealPage() {
 
   const sharesTotal = shares.reduce((sum, share) => sum + share.sharePercent, 0);
   const isValidShares = Math.abs(sharesTotal - 100) < 0.01;
-  const canSubmit = objectName && objectAddress && totalAmount && shares.length > 0 && isValidShares;
+
+  // Submit validation depends on role
+  const canSubmit = objectName && objectAddress && totalAmount && shares.length > 0 && isValidShares &&
+    (isAgencyAdmin || (isM2Operator && selectedDeveloperId && selectedProjectId));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -269,10 +286,12 @@ export default function NewDealPage() {
               <p className="mt-1 text-sm text-gray-500">
                 Укажите объект и распределите доли между участниками
               </p>
-              <div className="mt-2 flex items-center gap-2 text-sm text-blue-600">
-                <Info className="w-4 h-4" />
-                <span>Система работает только для объектов в Москве</span>
-              </div>
+              {isM2Operator && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-blue-600">
+                  <Info className="w-4 h-4" />
+                  <span>Система работает только для объектов в Москве</span>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex gap-3">
@@ -289,42 +308,45 @@ export default function NewDealPage() {
         <Card>
           <CardHeader title="Основная информация" />
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Select
-                label="Застройщик"
-                value={selectedDeveloperId}
-                onChange={(e) => setSelectedDeveloperId(e.target.value)}
-                options={[
-                  { value: '', label: 'Выберите застройщика' },
-                  ...developers.map(d => ({
-                    value: d.id,
-                    label: d.name
-                  }))
-                ]}
-                required
-              />
-              <Select
-                label="Проект / ЖК"
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                options={[
-                  { value: '', label: selectedDeveloperId ? 'Выберите проект' : 'Сначала выберите застройщика' },
-                  ...filteredProjects.map(p => ({
-                    value: p.id,
-                    label: p.projectName
-                  }))
-                ]}
-                required
-                disabled={!selectedDeveloperId}
-              />
-            </div>
+            {/* Only M2 Operator can select developer and project */}
+            {isM2Operator && (
+              <div className="grid grid-cols-2 gap-4">
+                <Select
+                  label="Застройщик"
+                  value={selectedDeveloperId}
+                  onChange={(e) => setSelectedDeveloperId(e.target.value)}
+                  options={[
+                    { value: '', label: 'Выберите застройщика' },
+                    ...developers.map(d => ({
+                      value: d.id,
+                      label: d.name
+                    }))
+                  ]}
+                  required
+                />
+                <Select
+                  label="Проект / ЖК"
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  options={[
+                    { value: '', label: selectedDeveloperId ? 'Выберите проект' : 'Сначала выберите застройщика' },
+                    ...filteredProjects.map(p => ({
+                      value: p.id,
+                      label: p.projectName
+                    }))
+                  ]}
+                  required
+                  disabled={!selectedDeveloperId}
+                />
+              </div>
+            )}
             <Input
               label="Название объекта"
               placeholder="ЖК Солнечный"
               value={objectName}
               onChange={(e) => setObjectName(e.target.value)}
               required
-              disabled={!selectedProjectId}
+              disabled={isM2Operator && !selectedProjectId}
             />
             <Input
               label="Адрес объекта"
@@ -332,7 +354,7 @@ export default function NewDealPage() {
               value={objectAddress}
               onChange={(e) => setObjectAddress(e.target.value)}
               required
-              disabled={!selectedProjectId}
+              disabled={isM2Operator && !selectedProjectId}
             />
             <div className="grid grid-cols-2 gap-4">
               <Input
