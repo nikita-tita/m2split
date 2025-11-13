@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Removed 'output: export' to support dynamic routes
+  output: 'export',
   basePath: process.env.NODE_ENV === 'production' ? '/m2split' : '',
   images: {
     unoptimized: true,
