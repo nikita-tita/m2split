@@ -1,5 +1,11 @@
-// User roles
-export type UserRole = 'DEVELOPER_ADMIN' | 'M2_OPERATOR' | 'CONTRACTOR' | 'BANK_INTEGRATION';
+// User roles (extended)
+export type UserRole =
+  | 'DEVELOPER_ADMIN'     // Застройщик-Админ
+  | 'M2_OPERATOR'         // М2-Оператор
+  | 'AGENCY_ADMIN'        // АН-Админ
+  | 'CONTRACTOR'          // Агент/ИП/НПД
+  | 'ACCOUNTANT'          // Бухгалтер/Юрист застройщика
+  | 'BANK_INTEGRATION';   // Банк (системная интеграция)
 
 // Tax regimes
 export type TaxRegime = 'VAT' | 'USN' | 'NPD';
@@ -10,8 +16,8 @@ export type VATRate = 0 | 10 | 20 | 22;
 // Contractor roles
 export type ContractorRole = 'AGENCY' | 'AGENT' | 'IP' | 'NPD';
 
-// Deal statuses
-export type DealStatus = 'DRAFT' | 'IN_PROGRESS' | 'IN_REGISTRY' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED';
+// Deal statuses (extended with APPROVED)
+export type DealStatus = 'DRAFT' | 'IN_REGISTRY' | 'APPROVED' | 'SENT_TO_BANK' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED';
 
 // Registry statuses
 export type RegistryStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'SENT_TO_BANK' | 'EXECUTED' | 'PARTIALLY_EXECUTED' | 'ERROR';
@@ -22,13 +28,24 @@ export type PaymentStatus = 'PENDING' | 'ACCEPTED_BY_BANK' | 'EXECUTED' | 'ERROR
 // Primary document statuses
 export type PrimaryDocStatus = 'NOT_REQUESTED' | 'REQUESTED' | 'UPLOADED' | 'VERIFIED' | 'REJECTED';
 
-// User interface
+// User interface (extended with emulation)
 export interface User {
   id: string;
   email: string;
   name: string;
   role: UserRole;
+  partyId?: string; // Organization ID
+  canEmulateRoles?: boolean; // QA/Admin flag
   createdAt: Date;
+}
+
+// Role emulation state
+export interface RoleEmulation {
+  isEmulating: boolean;
+  realUserId?: string;
+  realRole?: UserRole;
+  actedAsRole?: UserRole;
+  actedAsPartyId?: string;
 }
 
 // Contractor interface
@@ -63,7 +80,15 @@ export interface DealShare {
   contractDate?: Date;
 }
 
-// Deal interface
+// Deal initiator (immutable)
+export interface DealInitiator {
+  role: UserRole;
+  partyId: string;
+  userId: string;
+  timestamp: Date;
+}
+
+// Deal interface (extended with initiator)
 export interface Deal {
   id: string;
   objectName: string;
@@ -78,6 +103,10 @@ export interface Deal {
   contractDate?: Date;
   specialAccountReceiptDate?: Date;
   responsibleUserId?: string;
+
+  // Initiator (immutable, read-only)
+  initiator: DealInitiator;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -159,15 +188,34 @@ export interface PrimaryDocument {
   updatedAt: Date;
 }
 
-// Audit log interface
+// Audit log interface (extended with emulation tracking)
 export interface AuditLog {
   id: string;
-  userId: string;
+  timestamp: Date;
+
+  // Real user
+  performedByUserId: string;
+  performedByRole: UserRole;
+
+  // Emulation (if any)
+  actedAsRole?: UserRole;
+  actedAsPartyId?: string;
+  emulatedByUserId?: string;
+
+  // Action
   entityType: 'DEAL' | 'REGISTRY' | 'PAYMENT' | 'CONTRACTOR' | 'DOCUMENT';
   entityId: string;
   action: string;
-  oldValue?: string;
-  newValue?: string;
+
+  // Changes
+  before?: Record<string, any>;
+  after?: Record<string, any>;
+
+  // Context
+  source: 'UI' | 'API';
+  ipAddress: string;
+  userAgent?: string;
+
   createdAt: Date;
 }
 
