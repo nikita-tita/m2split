@@ -352,3 +352,32 @@ export interface CreateTariffInput {
   isActive: boolean;
   comments?: string;
 }
+
+// Event logging types
+export type EventType =
+  | 'DEAL_CREATED'
+  | 'DEAL_UPDATED'
+  | 'DEAL_STATUS_CHANGED'
+  | 'REGISTRY_CREATED'
+  | 'REGISTRY_APPROVED'
+  | 'REGISTRY_SENT_TO_BANK'
+  | 'REGISTRY_EXECUTED'
+  | 'PAYMENT_STATUS_CHANGED'
+  | 'CONTRACTOR_CREATED'
+  | 'CONTRACTOR_UPDATED'
+  | 'CONTRACTOR_OFFER_ACCEPTED'
+  | 'DOCUMENT_UPLOADED'
+  | 'DOCUMENT_VERIFIED';
+
+export interface Event {
+  id: string;
+  type: EventType;
+  entityType: 'DEAL' | 'REGISTRY' | 'PAYMENT' | 'CONTRACTOR' | 'DOCUMENT';
+  entityId: string;
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  description: string;
+  metadata?: Record<string, any>;
+  timestamp: Date;
+}

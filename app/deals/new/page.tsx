@@ -15,6 +15,7 @@ import { formatCurrency } from '@/lib/validations';
 import { counterpartiesService } from '@/lib/services/counterparties.service';
 import { projectsService } from '@/lib/services/projects.service';
 import { tariffsService } from '@/lib/services/tariffs.service';
+import { eventsService } from '@/lib/services/events.service';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
