@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardHeader } from '@/components/ui/Card';
@@ -7,9 +5,15 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
 import { ArrowLeft, Send, Download, CheckCircle } from 'lucide-react';
-import { useStore } from '@/lib/store';
+import { mockRegistries } from '@/lib/mock-data';
 import { formatCurrency, formatDate, getTaxRegimeLabel } from '@/lib/validations';
 import Link from 'next/link';
+
+export async function generateStaticParams() {
+  return mockRegistries.map((registry) => ({
+    id: registry.id,
+  }));
+}
 
 interface RegistryDetailPageProps {
   params: { id: string };
@@ -17,8 +21,7 @@ interface RegistryDetailPageProps {
 
 export default function RegistryDetailPage({ params }: RegistryDetailPageProps) {
   const { id } = params;
-  const { registries } = useStore();
-  const registry = registries.find((r) => r.id === id);
+  const registry = mockRegistries.find((r) => r.id === id);
 
   if (!registry) {
     return (

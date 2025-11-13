@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardHeader } from '@/components/ui/Card';
@@ -7,9 +5,15 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table';
 import { ArrowLeft, FileStack, Edit, Trash2, Plus } from 'lucide-react';
-import { useStore } from '@/lib/store';
+import { mockDeals } from '@/lib/mock-data';
 import { formatCurrency, formatDate, getTaxRegimeLabel } from '@/lib/validations';
 import Link from 'next/link';
+
+export async function generateStaticParams() {
+  return mockDeals.map((deal) => ({
+    id: deal.id,
+  }));
+}
 
 interface DealDetailPageProps {
   params: { id: string };
@@ -17,8 +21,7 @@ interface DealDetailPageProps {
 
 export default function DealDetailPage({ params }: DealDetailPageProps) {
   const { id } = params;
-  const { deals } = useStore();
-  const deal = deals.find((d) => d.id === id);
+  const deal = mockDeals.find((d) => d.id === id);
 
   if (!deal) {
     return (
