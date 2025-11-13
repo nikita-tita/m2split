@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'export',
-  basePath: '/m2split',
+  basePath: process.env.NODE_ENV === 'production' ? '/m2split' : '',
   images: {
     unoptimized: true,
   },

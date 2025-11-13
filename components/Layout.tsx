@@ -12,18 +12,60 @@ import {
   FileCheck,
   Users,
   Settings,
-  LogOut,
 } from 'lucide-react';
-import { useStore } from '@/lib/store';
+import { useStore, UserRole } from '@/lib/store';
+import { RoleSwitcher } from './RoleSwitcher';
 
-const navigation = [
-  { name: 'Дашборд', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Сделки', href: '/deals', icon: FileText },
-  { name: 'Реестры', href: '/registries', icon: FileStack },
-  { name: 'Выплаты', href: '/payments', icon: CreditCard },
-  { name: 'Документы', href: '/documents', icon: FileCheck },
-  { name: 'Контрагенты', href: '/contractors', icon: Users },
-  { name: 'Настройки', href: '/settings', icon: Settings },
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: any;
+  roles: UserRole[]; // Which roles can see this item
+}
+
+const navigation: NavigationItem[] = [
+  {
+    name: 'Дашборд',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+    roles: ['DEVELOPER_ADMIN', 'M2_OPERATOR', 'AGENCY_ADMIN', 'CONTRACTOR'],
+  },
+  {
+    name: 'Сделки',
+    href: '/deals',
+    icon: FileText,
+    roles: ['DEVELOPER_ADMIN', 'M2_OPERATOR', 'AGENCY_ADMIN', 'CONTRACTOR'],
+  },
+  {
+    name: 'Реестры',
+    href: '/registries',
+    icon: FileStack,
+    roles: ['DEVELOPER_ADMIN', 'M2_OPERATOR'],
+  },
+  {
+    name: 'Выплаты',
+    href: '/payments',
+    icon: CreditCard,
+    roles: ['DEVELOPER_ADMIN', 'M2_OPERATOR', 'AGENCY_ADMIN', 'CONTRACTOR'],
+  },
+  {
+    name: 'Документы',
+    href: '/documents',
+    icon: FileCheck,
+    roles: ['DEVELOPER_ADMIN', 'M2_OPERATOR', 'AGENCY_ADMIN', 'CONTRACTOR'],
+  },
+  {
+    name: 'Контрагенты',
+    href: '/contractors',
+    icon: Users,
+    roles: ['DEVELOPER_ADMIN', 'M2_OPERATOR'],
+  },
+  {
+    name: 'Настройки',
+    href: '/settings',
+    icon: Settings,
+    roles: ['DEVELOPER_ADMIN', 'M2_OPERATOR'],
+  },
 ];
 
 interface LayoutProps {
@@ -32,7 +74,12 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const pathname = usePathname();
-  const { currentUser } = useStore();
+  const { currentRole } = useStore();
+
+  // Filter navigation based on current role
+  const visibleNavigation = navigation.filter((item) =>
+    item.roles.includes(currentRole)
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -46,9 +93,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-            {navigation.map((item) => {
+            {visibleNavigation.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
 
               return (
                 <Link
@@ -68,30 +115,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             })}
           </nav>
 
-          {/* User info */}
-          {currentUser && (
-            <div className="p-4 border-t border-gray-200">
-              <div className="flex items-center">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {currentUser.name}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {currentUser.role === 'DEVELOPER_ADMIN' && 'Застройщик'}
-                    {currentUser.role === 'M2_OPERATOR' && 'Оператор М2'}
-                    {currentUser.role === 'CONTRACTOR' && 'Исполнитель'}
-                    {currentUser.role === 'BANK_INTEGRATION' && 'Банк'}
-                  </p>
-                </div>
-                <button
-                  className="ml-3 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-                  title="Выйти"
-                >
-                  <LogOut className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Role Switcher */}
+          <div className="p-4 border-t border-gray-200">
+            <RoleSwitcher />
+          </div>
         </div>
       </div>
 
