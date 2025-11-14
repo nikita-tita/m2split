@@ -8,14 +8,15 @@ const mockTariffs: Tariff[] = [
   {
     id: 'tariff-universal',
     tariffId: 'TAR-UNIVERSAL-BASE',
-    developerId: undefined, // Applies to all
+    developerId: '', // Applies to all
     developerName: 'Все застройщики',
-    projectId: undefined, // Applies to all projects
+    developerLegalEntity: 'М2 (универсальный тариф)',
+    projectId: '', // Applies to all projects
     projectName: 'Все проекты',
     region: 'Москва',
     city: 'Москва',
     segment: 'FLATS',
-    objectCategory: undefined, // Any category
+    objectCategory: '1_ROOM', // Default category for display
     paymentStage: 'ADVANCE',
     commissionSchemeType: 'PERCENT_OF_CONTRACT',
     commissionTotalPercent: 2.5, // Base rate for unique client
@@ -33,12 +34,13 @@ const mockTariffs: Tariff[] = [
     tariffId: 'TAR-SAMOLET-BASE',
     developerId: 'dev-samolot',
     developerName: 'Группа «Самолет»',
+    developerLegalEntity: 'ООО «Самолет»',
     projectId: 'prj-kvartal-domashniy',
     projectName: 'ЖК «Квартал Домашний»',
     region: 'Москва',
     city: 'Москва',
     segment: 'FLATS',
-    objectCategory: undefined,
+    objectCategory: '1_ROOM',
     paymentStage: 'ADVANCE',
     commissionSchemeType: 'PERCENT_OF_CONTRACT',
     commissionTotalPercent: 2.7, // Higher rate for Samolet
@@ -56,12 +58,13 @@ const mockTariffs: Tariff[] = [
     tariffId: 'TAR-LEVEL-BASE',
     developerId: 'dev-level',
     developerName: 'Level Group',
-    projectId: undefined, // All Level Group projects
-    projectName: undefined,
+    developerLegalEntity: 'ООО «Level Group»',
+    projectId: '', // All Level Group projects
+    projectName: 'Все проекты Level Group',
     region: 'Москва',
     city: 'Москва',
     segment: 'FLATS',
-    objectCategory: undefined,
+    objectCategory: '1_ROOM',
     paymentStage: 'ADVANCE',
     commissionSchemeType: 'PERCENT_OF_CONTRACT',
     commissionTotalPercent: 3.0, // Premium rate
